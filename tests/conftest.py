@@ -12,6 +12,7 @@ from mcslab.rng import STRIDE
 
 _RECORDS = []
 _DURATIONS = {}
+_NOTES = []
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -41,15 +42,26 @@ def report(request):
     return _record
 
 
+@pytest.fixture
+def note():
+    """Record a line for the "nuclear data checks" section of the summary
+    (deterministic data-consistency findings, not statistical checks)."""
+    return _NOTES.append
+
+
 def pytest_runtest_logreport(report):
     if report.when == "call":
         _DURATIONS[report.nodeid.split("::")[-1]] = report.duration
 
 
 def pytest_terminal_summary(terminalreporter):
+    tr = terminalreporter
+    if _NOTES:
+        tr.section("nuclear data checks")
+        for line in _NOTES:
+            tr.write_line(line)
     if not _RECORDS:
         return
-    tr = terminalreporter
     tr.section("physics validation summary")
     tr.write_line(f"{'test':<46}{'quantity':<34}{'measured':>14}{'expected':>14}"
                   f"{'SE':>11}{'n_SE':>8}{'time s':>8}{'max_draws':>11}")
