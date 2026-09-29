@@ -73,6 +73,16 @@ MT 301/901/444 are shown as the stored value (eV-b) / sigma_t = eV per collision
 | Be9 | 1.914 MeV | 1.916 MeV | 0.01268 MeV | 0 | 0 | 0.02088 | - | 0.9794 |
 | F19 | 2.019 MeV | 2.468 MeV | 0.05508 MeV | 0.08041 | 0.02221 | 0.01303 | - | 0.4102 |
 
+## Figures
+
+![be9_n2n.png](figures/be9_n2n.png)
+
+![fe56_total.png](figures/fe56_total.png)
+
+![overview.png](figures/overview.png)
+
+![tritium_production.png](figures/tritium_production.png)
+
 ## Reactions per nuclide
 
 Columns:
