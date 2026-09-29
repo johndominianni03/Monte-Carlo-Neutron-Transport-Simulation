@@ -139,12 +139,16 @@ before Phase 2b.**
 - [x] Author/committer email on the 7 Phase 1 commits rewritten to the
       GitHub noreply address. Trees and dates are unchanged. `main` = `da7822a`.
 - [x] Branch `phase-2a` created off `main`.
-- [ ] Data fetched
-- [ ] Reader
-- [ ] Inventory
-- [ ] Lookup and materials
-- [ ] CE kernel
-- [ ] Tests a-d
-- [ ] Regression reference
-- [ ] Plots
-- [ ] Docs
+- [x] Data fetched: 14 nuclides, ~276 MB, sha256 pinned (`9bab6b4`).
+- [x] Reader (`4bb3de3`).
+- [x] Lookup and materials (`61a8d9c`). Committed before the inventory,
+      because the inventory uses the lookup for sigma(14.1 MeV).
+- [x] Inventory (`5e56e23`).
+- [x] CE kernel (`c0cff3c`).
+- [x] Tests a-d (`84b8816`). MT 1 is not stored, so (c) checks for no double
+      counting and the redundant sums, as explained in the README.
+- [x] Regression reference (`a165ab2`).
+- [x] Plots (`b9edff2`).
+- [x] Docs (README). This is the last Phase 2a commit.
+
+Phase 2a is complete. Phase 2b (kinematics) has not been started.
