@@ -1,0 +1,11 @@
+# Pinned exactly: the bit-identical regression reference depends on the
+# numpy / numba / llvmlite versions (libm and LLVM codegen). Upgrading any of
+# these may require regenerating tests/reference with a stated reason.
+# Python 3.9.6 (macOS, Apple Silicon).
+numpy==2.0.2
+numba==0.60.0
+llvmlite==0.43.0
+scipy==1.13.1
+matplotlib==3.9.4
+h5py==3.14.0
+pytest==8.4.2

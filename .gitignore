@@ -1,0 +1,21 @@
+# Environment
+venv/
+.venv/
+
+# Python / numba caches (numba's cache=True writes *.nbi / *.nbc into __pycache__)
+__pycache__/
+*.py[cod]
+*.nbi
+*.nbc
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Ad-hoc run outputs. The regression reference in tests/reference/ is small
+# (tens of KB) and IS committed -- it is the contract refactors are held to.
+outputs/
+scratch/
+*.h5
