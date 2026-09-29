@@ -1,0 +1,195 @@
+{
+  "reason": "Initial Phase 2a CE reference: first-collision-ends-history kernel on ENDF/B-VIII.0 294 K data (W | void | FLiBe | Fe, log-uniform 1 keV-14.1 MeV), validated by tests/test_nucdata.py",
+  "recorded_utc": "2026-09-29T22:46:06+00:00",
+  "git_commit": "84b88164228a627706cbb0f125e20d8f27443d04",
+  "git_dirty": false,
+  "environment": {
+    "python": "3.9.6",
+    "numpy": "2.0.2",
+    "numba": "0.60.0",
+    "llvmlite": "0.43.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64"
+  },
+  "library": "ENDF/B-VIII.0",
+  "data_files": {
+    "neutron/Be9.h5": "2ccad4289825e558489fd0c7ddf7c796e2c2e0785ace6589c7ba5c3351eda9b0",
+    "neutron/F19.h5": "07f3ed44a951e453058e65e79a688ce96f4a20b189d3827c0b618a96e3b5a0ac",
+    "neutron/Fe54.h5": "9342a61e06c94428ff860e9d3e35179575897da9036cbbbb9312f4224b879b65",
+    "neutron/Fe56.h5": "afda738f1ce679b7c528ecf12414c5a3dc3b34dd1e9f5db7f4573c89f3a40fd4",
+    "neutron/Fe57.h5": "db2c4825ba74f476c1a839e4c5df283f61fc56a8cf28ad157307111c02a90ddd",
+    "neutron/Fe58.h5": "c71d1d63304b50f5cf1400afc9eda5185596645d6e9d6d730f89da5a3f2419dd",
+    "neutron/Li6.h5": "8399d640c224ed4d348a688e85017e5545040df1e38dbf45ab31d28c8827218b",
+    "neutron/Li7.h5": "a2a5a7a5901628c711d6e4085429bd46855bd8239f1ec9889b007f25d0e0f015",
+    "neutron/W180.h5": "7de5126bb2090cd95add7f37e38997d02657600bf66738bb7e601d34ec44bf27",
+    "neutron/W182.h5": "edbbdbd4166ae03411f00ade36d7c8b0837da6ffd9c6ad144cb18bedfdb770c1",
+    "neutron/W183.h5": "10973e7cbbc34362172b34f1b171b44f06622d2e6f0819d5599802e43007d686",
+    "neutron/W184.h5": "d845cab7f30dd7ba81d48edfe8353534b4cb2ddde5b5cec1c027a650e3c8b240",
+    "neutron/W186.h5": "41cbd1b9a9e4d887013807890ed720dbb66a086570b90cc6c12cf64ff8f48070"
+  },
+  "problems": {
+    "ce_beam": {
+      "bounds_cm": [
+        0.0,
+        0.2,
+        0.5,
+        5.5,
+        7.5
+      ],
+      "materials": [
+        {
+          "name": "W",
+          "density_g_cm3": 19.3,
+          "atoms_per_barn_cm": {
+            "W180": 7.586561028438191e-05,
+            "W182": 0.016753655604467673,
+            "W183": 0.009046974026412543,
+            "W184": 0.01937101915927885,
+            "W186": 0.01797382750320815
+          }
+        },
+        {
+          "name": "void",
+          "density_g_cm3": 0.0,
+          "atoms_per_barn_cm": {}
+        },
+        {
+          "name": "FLiBe",
+          "density_g_cm3": 1.9377867999999998,
+          "atoms_per_barn_cm": {
+            "Li6": 0.0017914263992888848,
+            "Li7": 0.021811029454319612,
+            "Be9": 0.011801227926804247,
+            "F19": 0.04720491170721699
+          }
+        },
+        {
+          "name": "Fe",
+          "density_g_cm3": 7.874,
+          "atoms_per_barn_cm": {
+            "Fe54": 0.004963012842736643,
+            "Fe56": 0.07790868783104497,
+            "Fe57": 0.0017992513624908375,
+            "Fe58": 0.00023944732620217847
+          }
+        }
+      ],
+      "source": "BeamSource()",
+      "spectrum": "LogUniform(e_lo=1000.0, e_hi=14100000.0)",
+      "library": "ENDF/B-VIII.0",
+      "temperature": "294K",
+      "n_batches": 20,
+      "histories_per_batch": 5000,
+      "seed": 20261003
+    },
+    "ce_iso": {
+      "bounds_cm": [
+        0.0,
+        0.2,
+        0.5,
+        5.5,
+        7.5
+      ],
+      "materials": [
+        {
+          "name": "W",
+          "density_g_cm3": 19.3,
+          "atoms_per_barn_cm": {
+            "W180": 7.586561028438191e-05,
+            "W182": 0.016753655604467673,
+            "W183": 0.009046974026412543,
+            "W184": 0.01937101915927885,
+            "W186": 0.01797382750320815
+          }
+        },
+        {
+          "name": "void",
+          "density_g_cm3": 0.0,
+          "atoms_per_barn_cm": {}
+        },
+        {
+          "name": "FLiBe",
+          "density_g_cm3": 1.9377867999999998,
+          "atoms_per_barn_cm": {
+            "Li6": 0.0017914263992888848,
+            "Li7": 0.021811029454319612,
+            "Be9": 0.011801227926804247,
+            "F19": 0.04720491170721699
+          }
+        },
+        {
+          "name": "Fe",
+          "density_g_cm3": 7.874,
+          "atoms_per_barn_cm": {
+            "Fe54": 0.004963012842736643,
+            "Fe56": 0.07790868783104497,
+            "Fe57": 0.0017992513624908375,
+            "Fe58": 0.00023944732620217847
+          }
+        }
+      ],
+      "source": "IsotropicPlaneSource(x0=3.0)",
+      "spectrum": "LogUniform(e_lo=1000.0, e_hi=14100000.0)",
+      "library": "ENDF/B-VIII.0",
+      "temperature": "294K",
+      "n_batches": 20,
+      "histories_per_batch": 5000,
+      "seed": 20261004
+    }
+  },
+  "arrays": {
+    "ce_beam__diagnostics": {
+      "shape": [
+        20,
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "029861e5449f48fe77a62155bdc52b5a0a7607a3e321b7afd6e20cb5a46887d0"
+    },
+    "ce_beam__region_sums": {
+      "shape": [
+        20,
+        4,
+        4
+      ],
+      "dtype": "float64",
+      "sha256": "f32274e73b4164875215bced66bddf5d04c124554aa61672299372281d606359"
+    },
+    "ce_beam__surface_sums": {
+      "shape": [
+        20,
+        2,
+        5
+      ],
+      "dtype": "float64",
+      "sha256": "9a30299c7036b5008962254e67a36107d623378cf4de6db4faf2a3ea6c244e7c"
+    },
+    "ce_iso__diagnostics": {
+      "shape": [
+        20,
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "029861e5449f48fe77a62155bdc52b5a0a7607a3e321b7afd6e20cb5a46887d0"
+    },
+    "ce_iso__region_sums": {
+      "shape": [
+        20,
+        4,
+        4
+      ],
+      "dtype": "float64",
+      "sha256": "6a4f194d8b6214ab6b042fb24bfaef256f618bd7e50c9040fa77105dd4db4b99"
+    },
+    "ce_iso__surface_sums": {
+      "shape": [
+        20,
+        2,
+        5
+      ],
+      "dtype": "float64",
+      "sha256": "e2be37ba2b12577e0e9abc2bb8390dba96f09845d6af5b22dc7cf51c796d4a81"
+    }
+  },
+  "history": []
+}
