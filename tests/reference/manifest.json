@@ -1,0 +1,149 @@
+{
+  "reason": "Initial Phase 1 reference: one-group analog transport engine, validated by tests/test_physics.py",
+  "recorded_utc": "2026-09-29T20:48:14+00:00",
+  "git_commit": "91c1864e6f5acf4f2e39ac7f4abd832905dce189",
+  "git_dirty": false,
+  "environment": {
+    "python": "3.9.6",
+    "numpy": "2.0.2",
+    "numba": "0.60.0",
+    "llvmlite": "0.43.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64"
+  },
+  "problems": {
+    "beam": {
+      "bounds_cm": [
+        0.0,
+        0.8,
+        1.3,
+        4.1,
+        5.0
+      ],
+      "materials": [
+        {
+          "name": "wall",
+          "sigma_t": 1.5,
+          "sigma_s": 0.6,
+          "sigma_a": 0.9
+        },
+        {
+          "name": "void",
+          "sigma_t": 0.0,
+          "sigma_s": 0.0,
+          "sigma_a": 0.0
+        },
+        {
+          "name": "moderator",
+          "sigma_t": 1.23,
+          "sigma_s": 1.2,
+          "sigma_a": 0.03
+        },
+        {
+          "name": "breeder",
+          "sigma_t": 1.5,
+          "sigma_s": 0.4,
+          "sigma_a": 1.1
+        }
+      ],
+      "source": "BeamSource()",
+      "n_batches": 20,
+      "histories_per_batch": 5000,
+      "seed": 20260929
+    },
+    "iso": {
+      "bounds_cm": [
+        0.0,
+        0.8,
+        1.3,
+        4.1,
+        5.0
+      ],
+      "materials": [
+        {
+          "name": "wall",
+          "sigma_t": 1.5,
+          "sigma_s": 0.6,
+          "sigma_a": 0.9
+        },
+        {
+          "name": "void",
+          "sigma_t": 0.0,
+          "sigma_s": 0.0,
+          "sigma_a": 0.0
+        },
+        {
+          "name": "moderator",
+          "sigma_t": 1.23,
+          "sigma_s": 1.2,
+          "sigma_a": 0.03
+        },
+        {
+          "name": "breeder",
+          "sigma_t": 1.5,
+          "sigma_s": 0.4,
+          "sigma_a": 1.1
+        }
+      ],
+      "source": "IsotropicPlaneSource(x0=2.35)",
+      "n_batches": 20,
+      "histories_per_batch": 5000,
+      "seed": 20260930
+    }
+  },
+  "arrays": {
+    "beam__diagnostics": {
+      "shape": [
+        20,
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "dee0929cc1ca6fc75cb0461164c5b5be2cf8e917ba75935707a23fc0d93f52f8"
+    },
+    "beam__region_sums": {
+      "shape": [
+        20,
+        4,
+        4
+      ],
+      "dtype": "float64",
+      "sha256": "d733fbd87db14dc77c6ef93d7ddb1e7a79688dcfc292f76c9f73e9e6efdaaae2"
+    },
+    "beam__surface_sums": {
+      "shape": [
+        20,
+        2,
+        5
+      ],
+      "dtype": "float64",
+      "sha256": "44736c5c5dabcd556d371b48eae9665e55a600e185fdf77c7d59d86b706cc478"
+    },
+    "iso__diagnostics": {
+      "shape": [
+        20,
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "fcb17739d5e201e58814890c44ed7bbe69b460309a114b1777f7216b9f93ec23"
+    },
+    "iso__region_sums": {
+      "shape": [
+        20,
+        4,
+        4
+      ],
+      "dtype": "float64",
+      "sha256": "9e49053a727384bb9e2cb42c725bd00773a4acb6d8ea4a92be6ac9059c8f7638"
+    },
+    "iso__surface_sums": {
+      "shape": [
+        20,
+        2,
+        5
+      ],
+      "dtype": "float64",
+      "sha256": "14f2eafc847aa872f8744342fc5a926881ed979efcf9988d15de11a9ee49d773"
+    }
+  },
+  "history": []
+}
