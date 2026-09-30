@@ -2,7 +2,11 @@
 
 Tests call the `report` fixture to record each checked quantity; the table
 (measured, expected, distance in standard errors, test runtime, max random
-numbers per history vs STRIDE) prints at the end of the pytest run.
+numbers per history vs STRIDE, and for kinematic transport runs the weight
+killed by the energy cutoff per source particle) prints at the end of the
+pytest run. The cutoff column is blank for kernels that have no energy
+cutoff (Phase 1, Phase 2a); kinematic tests always fill it, even with 0, so
+any cutoff bias is visible (approved deviation D5).
 """
 import math
 
@@ -31,13 +35,13 @@ def _warm_jit():
 def report(request):
     test = request.node.name
 
-    def _record(quantity, measured, expected, se, max_draws=None):
+    def _record(quantity, measured, expected, se, max_draws=None, cutoff=None):
         measured, expected, se = float(measured), float(expected), float(se)
         if se > 0.0:
             n_se = (measured - expected) / se
         else:
             n_se = 0.0 if measured == expected else math.inf
-        _RECORDS.append((test, quantity, measured, expected, se, n_se, max_draws))
+        _RECORDS.append((test, quantity, measured, expected, se, n_se, max_draws, cutoff))
         return n_se
     return _record
 
@@ -64,15 +68,16 @@ def pytest_terminal_summary(terminalreporter):
         return
     tr.section("physics validation summary")
     tr.write_line(f"{'test':<46}{'quantity':<34}{'measured':>14}{'expected':>14}"
-                  f"{'SE':>11}{'n_SE':>8}{'time s':>8}{'max_draws':>11}")
+                  f"{'SE':>11}{'n_SE':>8}{'time s':>8}{'max_draws':>11}{'cutoff/src':>12}")
     last = None
-    for test, q, m, e, se, n_se, md in _RECORDS:
+    for test, q, m, e, se, n_se, md, cut in _RECORDS:
         head = test if test != last else ""
         t = f"{_DURATIONS[test]:.2f}" if test != last and test in _DURATIONS else ""
         mds = str(md) if md is not None and test != last else ""
+        cuts = f"{cut:.4g}" if cut is not None and test != last else ""
         se_s = f"{se:.3e}" if se > 0 else "exact"
         tr.write_line(f"{head:<46}{q:<34}{m:>14.7g}{e:>14.7g}{se_s:>11}"
-                      f"{n_se:>+8.2f}{t:>8}{mds:>11}")
+                      f"{n_se:>+8.2f}{t:>8}{mds:>11}{cuts:>12}")
         last = test
     worst = max(abs(r[5]) for r in _RECORDS)
     tr.write_line(f"{len(_RECORDS)} checks; largest |n_SE| = {worst:.2f}; "
