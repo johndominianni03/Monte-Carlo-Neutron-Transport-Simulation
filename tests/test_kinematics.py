@@ -25,6 +25,27 @@ What each test covers, and what it doesn't:
        window starts 8 collision intervals below the source, and the
        Placzek transient there is bounded by a deterministic solve in the
        test. It does not cover absorption, leakage or anisotropy.
+  (c)  test_c_*: every discrete-level event conserves energy and momentum,
+       to round-off. Levels are real (Fe56, Li7, F19, W184, all MT 51-90,
+       with their tabulated CM angle data) plus a synthetic isotropic one.
+       Each is tested just above threshold, at 1.5x threshold and at
+       14.1 MeV, from three incoming directions that cover both branches of
+       rotate_angle. The recoil momentum is p_in - p_out (m_n = 1,
+       M = AWR); the check is E_in + Q = E_out + p_R^2/(2 AWR), relative
+       to E_in, <= 1e-12. Elastic events (Q = 0) are checked the same way.
+       It covers the level CM energy (from AWR and Q, approved D4), the
+       CM -> lab transform and the rotation. It does not test the angular
+       distributions (see a2) or relativistic kinematics (all of mcslab,
+       like OpenMC, is non-relativistic here).
+  (d)  test_d_*: exact neutron balance in a finite multiplying slab (two
+       material regions and a void) of synthetic nuclides with elastic,
+       capture, a level, an (n,2n) (yield 2) and an (n,3n) (yield 3). The
+       energy cutoff is set so that weight really is killed, including
+       secondaries born below it. Exact per batch:
+       sources + created == absorbed + leak_left + leak_right + cutoff,
+       with every term taken from a tally and cross-checked against its
+       independent int64 counter, and created == (y - 1) x events per
+       channel. It does not test the physics of any law.
   (a2) test_a2_*: the tabular-angle sampler (distributions.sample_angle) on
        real ENDF/B-VIII.0 tables. Expected bin probabilities are computed
        here from the raw HDF5 datasets (h5py) through the sampler's exact
@@ -51,7 +72,8 @@ from mcslab.config_kin import EnergyCutoffWarning, KinRunConfig, run_kin
 from mcslab.geometry import SlabGeometry
 from mcslab.nucdata import AngleDistribution, Library, Tabular
 from mcslab.rng import RNG_SIZE, STRIDE, init_history, prn
-from mcslab.sources import IsotropicPlaneSource
+from mcslab.ce_materials import VOID_CE
+from mcslab.sources import BeamSource, IsotropicPlaneSource
 
 P_MIN = 0.0027          # chi-square / Hotelling acceptance (3-sigma equivalent)
 N_SIGMA = 3.0
@@ -60,6 +82,8 @@ N_SIGMA = 3.0
 SEED_A = 20261010
 SEED_A2 = 20261011
 SEED_B = 20261012
+SEED_C = 20261013
+SEED_D = 20261014
 
 
 def _library():
@@ -424,3 +448,167 @@ def test_b_infinite_medium_slowing_down(report, note, A):
         hotelling_check(report, f"A={A:g} {name} phi in 10 bins",
                         res.spectrum_batches(est)[:, 0, :], expected,
                         res.max_draws, cutoff_per_src)
+
+
+# ---------------------------------------------------------------------------
+# (c) energy and momentum conservation, per event
+# ---------------------------------------------------------------------------
+@njit(cache=True)
+def _conservation_residual(ip, fp, prod, awr, q, cm, elastic, E, u0, v0, w0, seed, n):
+    """Worst |E_in + Q - E_out - p_R^2/(2 AWR)| / E_in over n events, with
+    p_R = p_in - p_out, p = sqrt(2 E) * direction (m_n = 1). Also the worst
+    |1 - |u_out|| (unit direction)."""
+    rng = np.zeros(RNG_SIZE, np.uint64)
+    worst = 0.0
+    worst_norm = 0.0
+    for s in range(n):
+        init_history(rng, seed, np.uint64(s))
+        if elastic:
+            E2, u, v, w, mu = C.elastic_scatter(E, u0, v0, w0, awr, ip, fp, prod, rng)
+            qq = 0.0
+        else:
+            E2, u, v, w, mu, n_out = C.inelastic_scatter(E, u0, v0, w0, awr, q, cm,
+                                                         ip, fp, prod, rng)
+            qq = q
+        p1 = math.sqrt(2.0 * E)
+        p2 = math.sqrt(2.0 * E2)
+        px = p1 * u0 - p2 * u
+        py = p1 * v0 - p2 * v
+        pz = p1 * w0 - p2 * w
+        e_recoil = (px * px + py * py + pz * pz) / (2.0 * awr)
+        worst = max(worst, abs(E + qq - E2 - e_recoil) / E)
+        worst_norm = max(worst_norm, abs(1.0 - math.sqrt(u * u + v * v + w * w)))
+    return worst, worst_norm
+
+
+C_DIRECTIONS = ((0.6, 0.8, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0))   # last: w = 1 branch
+C_REAL = ("Fe56", "Li7", "F19", "W184")
+
+
+def _conservation_cases(phys, names):
+    """(label, elastic?, channel) for elastic and every level channel."""
+    cases = []
+    for c, (name, mt) in enumerate(phys.labels):
+        if name in names and (mt == 2 or 51 <= mt <= 90):
+            cases.append((f"{name} MT {mt}", mt == 2, c))
+    return cases
+
+
+def _check_conservation(note, phys, cases, e_max, tag):
+    worst = (0.0, "")
+    worst_norm = 0.0
+    n_events = 0
+    for label, elastic, c in cases:
+        k = int(phys.ch_int[c, C.CH_NUC])
+        awr, q = float(phys.nuc_awr[k]), float(phys.ch_q[c])
+        prod = int(phys.ch_int[c, C.CH_PROD])
+        assert prod >= 0, label
+        thr = 0.0 if elastic else -q * (awr + 1.0) / awr
+        energies = [1.0e3, 1.0e6, 14.1e6] if elastic else [thr * (1.0 + 1e-6), 1.5 * thr, 14.1e6]
+        for E in energies:
+            if not E > thr or E > e_max:
+                continue
+            for d in C_DIRECTIONS:
+                res, norm = _conservation_residual(
+                    phys.ip, phys.fp, prod, awr, q, int(phys.ch_int[c, C.CH_CM]),
+                    elastic, E, d[0], d[1], d[2], np.uint64(SEED_C), 500)
+                n_events += 500
+                if res > worst[0]:
+                    worst = (res, f"{label} at {E:.6g} eV, u={d}")
+                worst_norm = max(worst_norm, norm)
+    note(f"(c) {tag}: {len(cases)} channels, {n_events} events: worst "
+         f"|E_in + Q - E_out - E_recoil| / E_in = {worst[0]:.1e} ({worst[1]}); "
+         f"worst | |u_out| - 1 | = {worst_norm:.1e} (bounds 1e-12)")
+    assert worst[0] <= 1e-12, worst
+    assert worst_norm <= 1e-12
+
+
+def test_c_level_and_elastic_conservation_real_data(note):
+    lib = _library()
+    nucs = {n: lib.load(n, distributions=True) for n in C_REAL}
+    phys = C.pack_physics(list(nucs), nucs)
+    cases = _conservation_cases(phys, C_REAL)
+    # every level of these nuclides is covered (98 in ENDF/B-VIII.0)
+    n_levels = sum(1 for nu in nucs.values() for mt in nu.partial_mts if 51 <= mt <= 90)
+    assert sum(1 for _, el, _ in cases if not el) == n_levels > 0
+    e_max = min(float(nu.energy[-1]) for nu in nucs.values())
+    _check_conservation(note, phys, cases, e_max, "real levels + elastic")
+
+
+def test_c_level_conservation_synthetic(note):
+    nuc = S.nuclide("L", awr=7.0, elastic_b=1.0,
+                    reactions=[(51, -0.5e6, 1.0, 1), (52, -3.0e6, 1.0, 1)])
+    phys = synthetic_physics(nuc)
+    _check_conservation(note, phys, _conservation_cases(phys, ("L",)), S.E_MAX,
+                        "synthetic isotropic levels + elastic")
+
+
+# ---------------------------------------------------------------------------
+# (d) exact neutron balance with multiplication
+# ---------------------------------------------------------------------------
+def _multiplying_problem(source):
+    x = S.nuclide("X", awr=9.0, elastic_b=2.0, capture_b=0.1,
+                  reactions=[(51, -1.0e6, 0.5, 1), (16, -2.0e6, 0.4, 2),
+                             (17, -4.0e6, 0.3, 3)])
+    y = S.nuclide("Y", awr=56.0, elastic_b=3.0, capture_b=0.05,
+                  reactions=[(51, -0.8e6, 1.0, 1)])
+    lib = S.SyntheticLibrary({"X": x, "Y": y})
+    a = S.SyntheticMaterial("a", (("X", 0.1),))
+    b = S.SyntheticMaterial("b", (("X", 0.05), ("Y", 0.04)))
+    geom = SlabGeometry([0.0, 4.0, 5.0, 12.0], [a, VOID_CE, b])
+    return KinRunConfig(geom, source, MonoEnergetic(14.1e6), lib, n_batches=20,
+                        histories_per_batch=5000, seed=SEED_D, energy_cutoff=1.0e5)
+
+
+@pytest.mark.parametrize("source", [BeamSource(), IsotropicPlaneSource(2.0)],
+                         ids=["beam", "iso"])
+def test_d_exact_neutron_balance(report, source):
+    cfg = _multiplying_problem(source)
+    with pytest.warns(EnergyCutoffWarning):
+        res = run_kin(cfg)
+    assert res.lost == 0 and res.max_draws < STRIDE
+    counts = res.diagnostics
+    n = float(cfg.histories_per_batch)
+    cutoff_per_src = float(res.cutoff_weight.sum()) / cfg.n_histories
+
+    # per batch, every term from a tally (float64 sums of weight 1.0: exact
+    # integers) and the same term from its int64 counter
+    src = counts[:, T.K_SOURCE].astype(np.float64)
+    created = counts[:, T.K_CREATED].astype(np.float64)
+    absorbed = res.region_sums[:, T.ABSORPTION, :].sum(axis=1)
+    left = res.surface_sums[:, T.NEG, 0]
+    right = res.surface_sums[:, T.POS, -1]
+    cut = res.cutoff_weight.sum(axis=1)
+    assert np.array_equal(src, np.full(cfg.n_batches, n))
+    assert np.array_equal(absorbed, counts[:, T.K_ABSORBED].astype(np.float64))
+    assert np.array_equal(left, counts[:, T.K_LEAK_LEFT].astype(np.float64))
+    assert np.array_equal(right, counts[:, T.K_LEAK_RIGHT].astype(np.float64))
+    assert np.array_equal(cut, counts[:, T.K_CUTOFF].astype(np.float64))
+    assert np.array_equal(src + created, absorbed + left + right + cut)
+
+    # multiplication: created == (y - 1) x events, per channel and in total
+    total = 0
+    for (name, mt), y in ((("X", 16), 2), (("X", 17), 3), (("X", 51), 1),
+                          (("Y", 51), 1), (("X", 2), 1), (("Y", 2), 1)):
+        events, made = res.channel_counts(name, mt)
+        assert events > 0, (name, mt)
+        assert made == (y - 1) * events, (name, mt, events, made)
+        total += made
+    assert total == res.count(T.K_CREATED)
+
+    # the test is not vacuous: every term is populated, including the cutoff
+    # and secondaries born below it (scored, not banked)
+    for k in (T.K_CREATED, T.K_ABSORBED, T.K_LEAK_LEFT, T.K_LEAK_RIGHT, T.K_CUTOFF,
+              T.K_BORN_BELOW_CUTOFF):
+        assert res.count(k) > 0, T.COUNT_NAMES[k]
+    assert res.diagnostics[:, T.K_MAX_BANK].max() >= 2
+
+    b = res.balance()
+    report("sources + created", b["source"] + b["created"],
+           b["absorbed"] + b["leak_left"] + b["leak_right"] + b["cutoff"], 0.0,
+           res.max_draws, cutoff_per_src)
+    report("  created by (n,2n) + (n,3n)", b["created"],
+           res.channel_counts("X", 16)[0] + 2 * res.channel_counts("X", 17)[0], 0.0)
+    report("  cutoff weight (born below)", b["cutoff"], res.count(T.K_CUTOFF), 0.0)
+    report("  secondaries born below cutoff", res.count(T.K_BORN_BELOW_CUTOFF),
+           res.count(T.K_BORN_BELOW_CUTOFF), 0.0)

@@ -55,9 +55,11 @@ K_COLLISIONS = 8     # collisions (every collision, absorbing or not)
 K_ELASTIC = 9        # elastic scatters
 K_INELASTIC = 10     # non-elastic scatters (any multiplicity)
 K_MAX_BANK = 11      # largest secondary-bank occupancy seen in the batch
-N_COUNTS = 12
+K_BORN_BELOW_CUTOFF = 12  # secondaries created below the cutoff (also in K_CUTOFF)
+N_COUNTS = 13
 COUNT_NAMES = ("max_draws", "lost", "source", "created", "absorbed", "leak_left",
-               "leak_right", "cutoff", "collisions", "elastic", "inelastic", "max_bank")
+               "leak_right", "cutoff", "collisions", "elastic", "inelastic", "max_bank",
+               "born_below_cutoff")
 
 
 def allocate(n_batches, n_regions):

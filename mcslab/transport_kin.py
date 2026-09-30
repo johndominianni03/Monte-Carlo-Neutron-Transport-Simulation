@@ -50,10 +50,10 @@ from . import collision as C
 from .geometry import distance_to_boundary
 from .rng import RNG_DRAWS, RNG_SIZE, init_history, prn
 from .sources import sample_source
-from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED, K_COLLISIONS,
-                      K_CREATED, K_CUTOFF, K_ELASTIC, K_INELASTIC, K_LEAK_LEFT,
-                      K_LEAK_RIGHT, K_LOST, K_MAX_BANK, K_MAX_DRAWS, K_SOURCE, NEG,
-                      POS, SPEC_COLL, SPEC_TL, TRACK_LENGTH)
+from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED,
+                      K_BORN_BELOW_CUTOFF, K_COLLISIONS, K_CREATED, K_CUTOFF, K_ELASTIC,
+                      K_INELASTIC, K_LEAK_LEFT, K_LEAK_RIGHT, K_LOST, K_MAX_BANK,
+                      K_MAX_DRAWS, K_SOURCE, NEG, POS, SPEC_COLL, SPEC_TL, TRACK_LENGTH)
 from .transport_ce import sample_energy
 from .xs import grid_locate, interp_at
 
@@ -202,6 +202,7 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                         # born below the cutoff: not banked, but scored
                         cutw[r] += wgt * extra
                         cnt[K_CUTOFF] += extra
+                        cnt[K_BORN_BELOW_CUTOFF] += extra
                     else:
                         if n_bank + extra > cap:
                             raise RuntimeError("secondary bank overflow (raise bank_capacity)")
