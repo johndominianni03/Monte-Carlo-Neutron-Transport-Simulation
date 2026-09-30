@@ -68,6 +68,33 @@ def interp_xs(grid, g0, n, xs, x0, thr, E):
 
 
 @njit(cache=True)
+def grid_locate(grid, g0, n, E):
+    """(i, f) for E on the nuclide grid grid[g0 : g0 + n], exactly as
+    interp_xs computes them. Pass the pair to interp_at so the search is done
+    once per nuclide and energy. interp_at then returns bit-identical values
+    to interp_xs."""
+    if not (grid[g0] <= E <= grid[g0 + n - 1]):
+        raise ValueError("energy outside the nuclide's energy grid")
+    i = find_index(grid, g0, g0 + n, E) - g0
+    if i == n - 1:
+        return i, 0.0
+    e_lo = grid[g0 + i]
+    return i, (E - e_lo) / (grid[g0 + i + 1] - e_lo)
+
+
+@njit(cache=True)
+def interp_at(i, f, n, xs, x0, thr):
+    """interp_xs for a precomputed (i, f) from grid_locate. The values
+    xs[x0 : x0 + n - thr] sit on grid points thr .. n-1."""
+    if i < thr:
+        return 0.0
+    k = x0 + i - thr
+    if i == n - 1:
+        return xs[k]
+    return xs[k] + f * (xs[k + 1] - xs[k])
+
+
+@njit(cache=True)
 def interp_many(grid, xs, thr, energies):
     """Vectorised interp_xs for one reaction on its own nuclide grid."""
     n = grid.shape[0]
