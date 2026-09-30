@@ -1,7 +1,7 @@
 {
-  "reason": "Initial Phase 1 reference: one-group analog transport engine, validated by tests/test_physics.py",
-  "recorded_utc": "2026-09-29T20:48:14+00:00",
-  "git_commit": "91c1864e6f5acf4f2e39ac7f4abd832905dce189",
+  "reason": "provenance update after author-email history rewrite; arrays unchanged",
+  "recorded_utc": "2026-09-30T20:35:16+00:00",
+  "git_commit": "95d2f9860d4de644f446a1532a8768e6ec1abeea",
   "git_dirty": false,
   "environment": {
     "python": "3.9.6",
@@ -145,5 +145,12 @@
       "sha256": "14f2eafc847aa872f8744342fc5a926881ed979efcf9988d15de11a9ee49d773"
     }
   },
-  "history": []
+  "history": [
+    {
+      "reason": "Initial Phase 1 reference: one-group analog transport engine, validated by tests/test_physics.py",
+      "recorded_utc": "2026-09-29T20:48:14+00:00",
+      "git_commit": "91c1864e6f5acf4f2e39ac7f4abd832905dce189",
+      "git_dirty": false
+    }
+  ]
 }
