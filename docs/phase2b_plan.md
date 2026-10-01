@@ -334,7 +334,7 @@ level.
 |---|---|---|
 | **f** | Each law on real data, calling the njit samplers directly, with expected bin probabilities integrated in the test from raw HDF5 (h5py). Level: E_cm deterministic, exact comparison. Law 4 (Li7 MT 16): chi-square on E_out and mu, at a tabulated incident energy and at a midpoint (mixture plus scaled interpolation computed in the test). Law 61 CM, lin-lin (Fe56 MT 91, W184 MT 16): joint (E_out, mu) chi-square at a tabulated incident energy, using the exact conditional rule (0.5/0.5 between the angle tables at k and k+1), plus the E_out marginal at a midpoint. Law 61 lab, histogram (Be9 MT 16). Applicability (F19 MT 16): the fraction of events per distribution at 3 SE plus E_out chi-square. The CM->lab transform is checked separately by the conservation check of (c) applied to two-body-consistent samples. | 20261020 |
 | **g** | Neutrons per event, from the new kernel's counters in single-collision runs. MT 16, 17, 24, 25, 37, 41 are exact integers (2, 3, 2, 3, 4, 2). MT 5 (Fe56, W184) at several energies: support in {floor(y), ceil(y)} is exact, and the mean equals y(E) at 3 SE, with y interpolated in the test from raw HDF5. | 20261021 |
-| free gas | Synthetic constant-cross-section, isotropic-CM scatterer, A in {1, 12}, kT = 0.0253 eV. Incident energies are drawn from the Maxwellian flux spectrum E exp(-E/kT). By detailed balance of the cxs kernel, E_out after one collision must follow the same spectrum: chi-square. Plus exact checks that the target is at rest at `E >= 400 kT` for A > 1, and that A <= 1 always gets free gas. | 20261022 |
+| free gas | **Corrected 2026-10-01** (before any free-gas code or test existed; see "Part 2 detailed plan", C). Synthetic isotropic-CM scatterer with a constant free-atom cross section sigma_f, A in {1, 12}, kT = 0.0253 eV. Incident energies are drawn from the collision density pi(E) ~ sigma_eff(E) E exp(-E/kT), where sigma_eff is the free-gas (Doppler-broadened) cross section of a constant sigma_f. By detailed balance of the cxs kernel, E_out after one collision must follow pi: chi-square, plus the mean of pi at 3 SE. Plus exact checks that the target is at rest at `E >= 400 kT` for A > 1, and that A <= 1 always gets free gas. *The approved text said "drawn from the Maxwellian flux spectrum E exp(-E/kT) ... E_out must follow the same spectrum". That is wrong: the cxs kernel conditioned on a collision preserves pi, not E exp(-E/kT). A scratch relaxation run found mean collision energies of 1.750 kT (A = 1) and 1.961 kT (A = 12), not 2 kT. Only the flux pi/sigma_eff is Maxwellian.* | 20261022 |
 | **h** | Regression reference: W / FLiBe / Fe slab, 14.1 MeV beam (D7). Region sums, surface sums, spectrum and counts, byte-exact. Recorded with `--reason`. | 20261023 |
 | tracks | The same problem with recording on vs off: every tally and count array (including max draws) is byte-identical. Recorded tracks are sane: time non-decreasing along each particle, x inside the slab, E constant between collisions. | 20261024 |
 
@@ -361,6 +361,519 @@ level.
   trail.
 - Saves `docs/figures/tracks.gif` (`PillowWriter`) and a static
   `docs/figures/tracks.png` of the same tracks.
+
+## Part 2 detailed plan (approved 2026-10-01)
+
+This section refines the Part 2 outline above for the Part 2 request
+(requirements A-H). Where the two differ, this section applies.
+
+**Approval (2026-10-01), with conditions:**
+- **P1: yes.** Temperatures change only in the D7 problem definition.
+  `ce_materials.flibe()` keeps its default temperature and density, and
+  the Phase 2a regression must stay byte-exact.
+- **P2, P3, P4, P6: yes,** as recommended.
+- **P5: yes, and required.** The specification under C ("Free-gas kernel
+  shape") is the approved one:
+  - fixed incident energies, so a kernel that leaves E unchanged fails
+  - A = 1 against the analytic free-gas kernel for hydrogen, derived and
+    cited in the docstring
+  - A = 12 against a numerically integrated kernel built independently of
+    the sampler
+  - one A = 12 incident energy above 400 kT, with an exact check that the
+    target-at-rest path is taken there
+- **If any statistical check fails during implementation:** stop and
+  report it. Seeds and thresholds are not changed.
+
+**Baseline at `293eb66`** (re-checked 2026-10-01):
+- 119 tests pass.
+- Phase 1 and Phase 2a compares are byte-exact.
+- The Part 1 hydrogen run reproduces: cutoff 6941 / 10000, residual 0.
+
+### Part 1 follow-ups
+
+**1. Are the (a) / (a2) chi-square references independent of the sampler's CDF?**
+- **(a), 3 tests: yes.** The expected distribution is uniform on
+  [alpha E, E], which is analytic. No table or CDF is involved.
+- **(a2), 4 tests: the code is separate, the construction is not.**
+  - The expected probabilities come from `table_cdf` / `mixture_cdf` in
+    the test: Python on raw h5py arrays, not the packer and not the njit
+    sampler.
+  - But they rebuild the sampler's own inverse-CDF map: the mass per
+    interval from the stored CDF column c, the shape inside an interval
+    from p, and OpenMC's table-choice rule.
+  - So a misreading of c shared by the sampler and the test would not be
+    caught.
+- **Proposed fix (P4).** Deterministic, no new statistical check, existing
+  expectation unchanged:
+  - (a2) also builds its bin probabilities from p alone: exact integration
+    of the piecewise-linear or piecewise-constant PDF, normalised by its
+    own integral, never reading c.
+  - It asserts agreement with the current probabilities to <= 1e-6 per bin
+    and reports the worst value.
+  - In the real tables, stored c and the integral of p agree to 9.2e-7
+    (mu) and 1.1e-7 (E_out). The synthetic histogram tables agree exactly.
+- Part 2's (f) uses the p-only construction as its primary reference.
+
+**2. Test (d): geometry, and the ~1.31 secondaries per source.**
+- **Geometry.**
+  - [0, 4] cm: material a, X at 0.1 /b-cm.
+  - [4, 5] cm: void.
+  - [5, 12] cm: material b, X 0.05 + Y 0.04 /b-cm.
+- **Nuclides.**
+  - X: A = 9. Elastic 2 b, capture 0.1 b, a level (Q = -1 MeV, 0.5 b),
+    (n,2n) (Q = -2 MeV, 0.4 b, yield 2) and (n,3n) (Q = -4 MeV, 0.3 b,
+    yield 3).
+  - Y: A = 56. Elastic 3 b, capture 0.05 b, a level (Q = -0.8 MeV, 1 b).
+- **Run.** 14.1 MeV beam at x = 0, and an isotropic plane source at
+  x = 2; cutoff 100 keV; 20 x 5000 histories; seed 20261014.
+- **Measured (re-run 2026-10-01).**
+  - Created per source: 1.309 (beam), 1.199 (isotropic).
+  - Multiplying events per source (beam): 0.625 (n,2n) and 0.342 (n,3n).
+- **Not physical.**
+  - The synthetic multiplying law is a level-type two-body law, and each
+    of the y identical copies gets the full two-body energy.
+  - (n,2n): mean lab energy 9.76 MeV per neutron, so the family carries
+    19.5 MeV out of the E + Q = 12.1 MeV available. For (n,3n): 23.9 vs
+    10.1 MeV.
+  - Energy is created. The secondaries stay above the 2.2 / 4.4 MeV
+    thresholds, and the flat cross sections make 21% of every collision
+    above 4.4 MeV a multiplying one.
+  - Real (n,2n) neutrons are emitted with soft spectra, mostly below
+    threshold (Be-9: E_out <= 0.88 E_in).
+- **Consequence.** (d) is fine as an integer-balance test. The
+  `synthetic.py` docstring and the README will say so explicitly, so that
+  nobody reads 1.31 as physical. D7 gives the first physical
+  multiplication number.
+
+### A. Law inventory
+
+**Method.** An h5py scan (independent of `nucdata.py`) of all 13 W /
+FLiBe / Fe nuclides plus H1, at 294 K. It covers every non-redundant
+reaction with an outgoing neutron.
+
+| law as stored | frame | reactions | status |
+|---|---|---|---|
+| uncorrelated: tabular angle (lin-lin), no energy law | CM | MT 2, all 14 nuclides | Part 1 |
+| uncorrelated: tabular angle + `level` | CM | MT 51-90: 231 reactions; 220 lin-lin angle tables, 11 histogram (Li7 MT 72-82) | Part 1 |
+| `correlated` (ACE law 61): one lin-lin incident region, E_out lin-lin, mu lin-lin, no discrete lines | CM | Fe54-58 MT 5, 16, 91; W180-186 MT 5, 16, 17, 28, 37, 41, 91 (47 reactions) | **Part 2** |
+| `correlated`, E_out histogram, mu lin-lin | lab | Be9 MT 16; F19 MT 16, 22, 28, 91 (5 reactions) | **Part 2** |
+| two `correlated` distributions + applicability (0.5 / 0.5, histogram, 10.99-20 MeV) | lab | F19 MT 16 | **Part 2** |
+| uncorrelated: tabular angle (lin-lin) + `continuous` (ACE law 4), one lin-lin incident region, E_out lin-lin, no discrete lines | lab | Li6 MT 24; Li7 MT 16, 24, 25 | **Part 2** |
+| yield, constant integer | | 1; 2 (MT 16, 24, 41); 3 (MT 17, 25); 4 (MT 37) | Part 1 |
+| yield, `Tabulated1D` (one lin-lin region), y from 0 to 8.23 | | MT 5 of all Fe and W (9 reactions) | **Part 2** |
+
+In total, 56 reactions use a Part 2 law.
+
+**What the scan found.**
+- Absent everywhere:
+  - discrete lines; Kalbach-Mann, N-body, evaporation, Maxwell and Watt
+    laws
+  - multi-region or histogram incident-energy interpolation
+  - repeated incident energies in law 4 / law 61 tables
+  - zero-width E_out tables
+- No extrapolation is needed. In every law 4 / law 61 reaction, the cross
+  section becomes positive at or above the first tabulated incident energy.
+- Every E_out table starts at E = 0 with c = 0, and ends with c = 1 and
+  p = 0.
+- Every `correlated` distribution carries an `applicability` dataset, even
+  when it is the only distribution (e.g. Fe54 MT 5, which is 0 below
+  5.5 MeV). OpenMC reads applicability only when there is more than one
+  distribution (`src/reaction_product.cpp`), and so does mcslab.
+- **MT 5 of Fe and W.**
+  - The cross section is at most 2e-7 b below 5 MeV.
+  - y = 0 below 5-6.5 MeV, so such an event ends the neutron.
+  - OpenMC does the same: `wgt *= 0`, and `alive()` is `wgt != 0`
+    (`include/openmc/particle_data.h`).
+- Stored c vs the integral of p: within 1.1e-7 (E_out) and 9.2e-7 (mu).
+- Photon products are ignored (neutron-only transport, as documented).
+
+**Called out for Phase 3 tritium breeding.**
+- **Be-9 (n,2n)** is MT 16, the only neutron-multiplying Be-9 reaction in
+  the file (there is no MT 875-891).
+  - sigma(14.1 MeV) = 0.484 b, 32% of sigma_t.
+  - Lab frame, law 61 with histogram E_out and lin-lin mu. Its 24 incident
+    energies run from 1.749 to 20 MeV. Yield 2.
+  - The second neutron is an identical copy (D3).
+  - This is FLiBe's neutron multiplier. Be-9's own tritium comes from
+    MT 105 via MT 700/701 (0.0209 b, an absorption).
+- **Li-7 (n,n'alpha)t** is MT 52-82: the levels above the bound 0.478 MeV
+  state, MT 51.
+  - Level law in CM, with two-body kinematics from each level's Q. This is
+    already implemented and conservation-tested in Part 1 (test c).
+  - Their sum, 0.301 b at 14.1 MeV, equals MT 205.
+  - The HDF5 drops ENDF's LR = 33 breakup flag. Only neutrons are
+    transported. Phase 3 must score MT 205, or MT 52-82 as a set.
+  - Part 2 matters to it indirectly: Li7 MT 16, 24 and 25 (law 4) are what
+    currently blocks FLiBe at fusion energies.
+- Li-6 (n,t)alpha is MT 105, an absorption, already handled in Part 1.
+
+**Deliverables.**
+- `scripts/law_inventory.py` (h5py only) generates `docs/law_inventory.md`:
+  per nuclide x MT, the law, frame, interpolation, yield, threshold and
+  sigma(14.1 MeV).
+- A test checks that every non-redundant neutron reaction of the 14
+  nuclides packs with zero unsupported channels, matching the inventory
+  row by row.
+
+**Unimplemented laws (policy change).**
+- Once free gas is in, energies are no longer monotone, so Part 1's
+  reachability exemption is removed.
+- `run_kin` raises `NotImplementedError` (listing them) if any nuclide in
+  the problem has a channel with an `UnsupportedLaw`, reachable or not.
+  The kernel's `RuntimeError` stays as a backstop.
+- The reader still refuses outright:
+  - unknown attributes or keys
+  - interpolation codes other than 1 or 2
+  - more than one interpolation region
+- It still keeps the following as `UnsupportedLaw` (named explicitly):
+  - discrete lines (`n_discrete_lines > 0`)
+  - Kalbach-Mann, N-body, evaporation, Maxwell and Watt laws
+- None of these occur in the 14 files, so nothing is refused for W,
+  FLiBe, Fe or H.
+
+### B. New laws: samplers and tests
+
+**Transcriptions** of OpenMC v0.16.0, re-read 2026-10-01. Each is cited in
+the code.
+
+- **`CorrelatedAngleEnergy::sample_dist`** (`src/secondary_correlated.cpp`):
+  - `get_energy_index`, then 1 draw to choose the incident table
+  - 1 draw for E_out from the stored CDF, then the scaled interpolation
+  - the angle table at k or k+1, whichever outgoing point is closer in CDF
+    space (always k for histogram E_out; `c_k1` starts at +inf)
+  - 1 draw for mu (`Tabular` sampling)
+- **`ContinuousTabular::sample`** (`src/distribution_energy.cpp`):
+  - its own bracketing: below the first energy i = 0, r = 0; above the
+    last, i = n - 2, r = 1
+  - a table-choice draw unless the incident interpolation is histogram
+  - 1 draw for E_out, then the scaling
+  - the angle is sampled first (`UncorrelatedAngleEnergy::sample`)
+- **`ReactionProduct::sample_dist`** (`src/reaction_product.cpp`): 1 draw;
+  the first distribution with `c <= cumulative applicability`. If the
+  cumulative sum falls short, it returns the last distribution. This is
+  mirrored as is, so no mcslab guard is needed.
+- **`Tabulated1D::operator()`** (`src/endf.cpp`): constant outside the
+  table, lin-lin or histogram inside.
+- **Yields (D2).** After sampling and rotation (OpenMC's order), y is
+  evaluated at E_in:
+  - integer y >= 1: y - 1 identical copies, no draw
+  - y = 0: the neutron ends, no draw
+  - otherwise: 1 draw, n = floor(y) + [xi < y - floor(y)]
+- **Known OpenMC hazard.** At an E_in above a correlated law's last
+  incident energy, OpenMC indexes past the end of its tables (undefined
+  behaviour). In these data the last incident energy equals the grid
+  maximum, and mcslab's lookups refuse energies above it, so the case is
+  unreachable. mcslab raises if it ever happens.
+- **Kernel draw contract**, per event:
+  - correlated: 3, plus 1 for phi; plus 1 if there are two distributions
+    (applicability); plus 1 for a non-integer yield
+  - law 4: 2 for the angle, 2 for the energy, 1 for phi
+
+**Test (f), seed 20261020 (approved).**
+- **Replay (exact).**
+  - Coverage: all 56 reactions at 3 incident energies (the first tabulated
+    energy above threshold, a tabulated energy near 14.1 MeV, and the
+    midpoint of the pair bracketing 14.1 MeV), 2000 events each.
+  - Each event's draws are replayed in plain Python on raw h5py arrays.
+  - These must match exactly: the incident table chosen, the distribution
+    chosen, the outgoing bin k, and the angle table.
+  - |F_l(E_out unscaled) - xi_E| and |F(mu) - xi_mu| must be <= 1e-9; the
+    worst values are reported.
+  - CM -> lab is recomputed from (E_cm, mu_cm) to <= 1e-12 relative.
+- **Statistical, reference built from p only.**
+  - The reference uses:
+    - exact integration of the piecewise PDFs
+    - the angle-table split at the CDF midpoint of each interval
+    - the scaling map applied analytically
+    - mixture weights 1 - r and r
+  - Each check is a joint (E_out, mu) chi-square in the law's frame: 8
+    E_out bins (equiprobable under the marginal) x 5 mu bins, 200 000
+    events.
+  - Cases, each at a tabulated energy and at a midpoint: Fe56 MT 91 (CM,
+    lin-lin), W184 MT 16 (CM, lin-lin), Be9 MT 16 (lab, histogram),
+    F19 MT 16 (applicability mixture), Li7 MT 16 (law 4 + angle).
+  - **10 checks.**
+- The approved outline's "fraction per distribution at 3 SE" for F19 is
+  replaced by the exact replay of the distribution choice.
+
+**Test (g), seed 20261021 (approved): yields.**
+- **Integer yields, exact, from kernel counters on real data.** Per
+  channel, created == (y - 1) x events and zero-yield == 0, for MT 16, 17,
+  24, 25, 37 and 41.
+  - W uses a 30 MeV mono source, so that MT 37 and 41 are open.
+  - FLiBe at 14.1 MeV covers Li MT 24 and 25.
+- **MT 5 (Fe56, W184): direct calls of the njit `inelastic_scatter`, at 3
+  energies each.**
+  - The energies are chosen so that y lies in (0,1), (1,2) and (2,3), and
+    one of them falls between points of the yield table.
+  - Exact: n is floor(y) or ceil(y), and no extra draw is made when y is
+    an integer.
+  - Mean n = y(E) at 3 SE, with y from `np.interp` on the raw h5py table.
+  - **6 checks.**
+- This replaces the outline's "single-collision kernel runs" (P6). The
+  coverage is the same, with less machinery.
+
+### C. Free gas and temperature
+
+**The rule, as in OpenMC v0.16.0.**
+- Sources: `src/physics.cpp`, `sample_target_velocity` (line 891) and
+  `sample_cxs_target_velocity`; the defaults are in `src/settings.cpp`.
+- The target is at rest iff `E >= free_gas_threshold * kT` and
+  `awr > 1`. The threshold defaults to 400.
+- Otherwise the cxs sampler is used: 5 or 6 draws per rejection
+  iteration, then 1 for the target direction.
+- Resonance scattering is off (OpenMC's default).
+- mu_cm is sampled at the lab energy.
+- kT is the kT of the selected data temperature (`scatter`:
+  `nuc->kTs_[i_temp]` for non-multipole data).
+- H-1 (awr 0.99917) gets free gas at all energies.
+- Free gas applies to elastic scattering only.
+- kT = 0 synthetic nuclides keep the target at rest (deviation 8).
+
+**Temperature is a per-material input** (K).
+- The default is 293.6 K (OpenMC's `temperature_default`).
+- The data temperature is chosen by OpenMC's "nearest" rule
+  (`src/nuclide.cpp`):
+  - available temperatures are round(kT / k_B) from `kTs`: 250, 294,
+    600, 900, 1200 and 2500 K in every file
+  - the nearest is taken, and refused if |dT| >= 10 K
+    (`temperature_tolerance`)
+- Each (nuclide, data temperature) pair is packed as its own entry, with
+  its own grid, cross sections and kT. The grids differ per temperature.
+- Phase 2a's `config_ce` keeps its single temperature and refuses a
+  material that asks for a different one. This is a guard only and
+  changes no results.
+
+**Code.**
+- `collision.sample_cxs_target_velocity`.
+- An elastic dispatcher that calls Part 1's `elastic_scatter`, unchanged,
+  whenever the target is at rest. Results for kT = 0, or E >= 400 kT, are
+  therefore bit-identical to Part 1.
+- A counter `K_FREE_GAS`.
+- `KinRunConfig.free_gas_threshold = 400.0`.
+- A diagnostic switch `free_gas=True` (P3). False reproduces Part 1; it
+  is mcslab-only and documented.
+
+**Free-gas test, seed 20261022 (approved; corrected above).**
+- **Setup.** A synthetic isotropic-CM scatterer, A in {1, 12},
+  kT = 0.0253 eV.
+- **Per event.**
+  - E_in is drawn from pi by inverse CDF, using the first draw of the
+    history's stream.
+  - One collision follows, through the same njit dispatcher the kernel
+    calls.
+- **Checks.**
+  - A chi-square of E_out against pi on 20 equiprobable bins.
+  - The mean of E_out against kT (2 - 1 / (2 (A + 1))) at 3 SE.
+  - 200 000 events per A. **4 checks.**
+- **Derived in the docstring.**
+  - **Effective cross section.** A constant free-atom sigma_f in a
+    Maxwellian gas gives
+    sigma_eff(E) = sigma_f [(1 + 1/(2a^2)) erf(a) + exp(-a^2) / (a sqrt(pi))],
+    with a^2 = A E / kT.
+  - **Detailed balance.** phi_M(E) sigma_eff(E) P(E->E') is symmetric
+    in E and E', with phi_M ~ E exp(-E/kT). So the stationary collision
+    density is pi ~ sigma_eff(E) E exp(-E/kT).
+  - **Mean of pi.** From the split into centre-of-mass and relative
+    velocity: kT (2 - 1/(2(A+1))), i.e. 1.75 kT for A = 1 and
+    1.9615 kT for A = 12.
+  - **Flux.** pi / sigma_eff is Maxwellian (mean 2 kT) only if the
+    tabulated cross section is sigma_eff. A constant tabulated cross
+    section gives (sigma_eff / sigma) x Maxwellian instead.
+- **Numerical bound.** The inverse-CDF table and the bin edges both come
+  from the closed-form pi, with a stated bound on the CDF table error
+  (<= 1e-9).
+- **Scratch evidence (numpy, 2026-09-30).** Collision chains starting at
+  1 eV reach pi within about 20 (A = 1) and 75 (A = 12) collisions. Their
+  mean collision energies are 1.7500 and 1.9615 kT, and their
+  flux-weighted mean is 2.00 kT.
+
+**Free-gas kernel shape, seed 20261025 (new, P5; required, as approved).**
+- E_out from a **fixed** E_in in {kT, 20 kT}, for A in {1, 12}. A kernel
+  that left E unchanged would fail.
+- **A = 1:** a chi-square against the analytic free-gas kernel for
+  hydrogen (Wigner-Wilkins). Its CDF is closed-form, and the docstring
+  derives and cites it.
+- **A = 12:** a chi-square against a kernel integrated numerically in the
+  test, independently of the sampler:
+  - Average over the Maxwellian target velocity, weighted by the relative
+    speed.
+  - Given the two velocities, E' is uniform on
+    [(|V_cm| - r)^2, (|V_cm| + r)^2] (isotropic CM; Archimedes' hat-box
+    theorem), with r the neutron's CM speed.
+- Deterministic self-checks of the references:
+  - the same integrator reproduces the closed-form A = 1 CDF
+  - its normalisation gives sigma_eff(E)
+  - quadrature refinement changes the probabilities by less than the
+    stated bound
+- **At rest above 400 kT, exact.** One extra A = 12 incident energy,
+  1000 kT. The dispatcher must take the target-at-rest path: results
+  bit-identical to Part 1's `elastic_scatter` on the same stream, and the
+  same draw count.
+- **Why it is needed.** Stationarity under pi cannot detect a wrong kernel
+  that still satisfies detailed balance; this test can.
+- **4 checks** (plus the exact at-rest check).
+
+**Dispatch and temperature, exact, seed 20261026 (new).**
+- **Free-gas threshold (A = 12).** At exactly E = 400 kT the target is at
+  rest; at the next float below, free gas is used.
+- **A <= 1.** A = 1 and H-1 get free gas at 14 MeV.
+- **At rest.** The result is bit-identical to Part 1's `elastic_scatter`,
+  and the draw counts are as documented.
+- **Kernel counter.** `K_FREE_GAS` equals the number of elastic events
+  for pure H-1. It is 0 for A = 12 with an energy cutoff >= 400 kT.
+- **Temperature selection.**
+  - 293.6 K selects 294K, 900 K selects 900K, and 950 K is refused.
+  - The packed xs and kT equal the raw h5py values.
+  - The same nuclide at two temperatures in two materials gives two
+    entries.
+
+**Not proposed.**
+- A transport-level Maxwellian check. It would need the synthetic
+  nuclide's tabulated elastic cross section to be sigma_eff(E), not a
+  constant, plus a way to end histories in a non-absorbing medium (e.g.
+  OpenMC's time cutoff).
+- A multi-collision convergence test from a 1 eV start, like the scratch
+  run.
+
+### D. Hydrogen before / after
+
+- `scripts/hydrogen_cutoff.py` runs the README problem with identical
+  inputs, twice:
+  - with `free_gas=False`. It must reproduce Part 1 exactly, and this is
+    asserted: 10000 / 1013 / 1421 / 625 / 6941, residual 0.
+  - with free gas on.
+- It reports both balances, the cutoff fraction, and max draws vs STRIDE.
+- **Expected after:** of order 1e-4, i.e. a few neutrons in 10^4.
+  - Estimate: one thermal H collision sends the neutron below 1e-5 eV
+    with probability about 4e-6, from the H kernel:
+    (4 / (3 sqrt(pi))) eps_c^(3/2) with eps_c = 4e-4.
+  - A thermalised neutron makes about 80 collisions before capture.
+- **The residual** is the sub-1e-5 eV tail of the thermal population.
+  OpenMC would keep transporting those neutrons on extrapolated cross
+  sections (deviation 2).
+- The result goes into the README, `docs/deviations_from_openmc.md` and
+  this file.
+
+### E. Regression (h), seed 20261023 (approved)
+
+- **Harness.** `tests/test_regression_kin.py` with `tests/reference_kin/`,
+  using the CE harness's CLI and rules. The manifest pins the sha256 of
+  the 13 data files.
+- **Problem D7.**
+  - W [0, 0.5] | FLiBe [0.5, 20.5] | Fe [20.5, 30.5] cm.
+  - 14.1 MeV beam at x = 0, natural Li, 20 x 5000 histories.
+  - At 14.1 MeV it reaches every Part 2 law and yield type.
+- **Arrays.**
+  - region_sums and surface_sums
+  - counts
+  - spectrum: 2 estimators x 3 regions x 40 log bins, 1e-5 eV to 20 MeV
+  - cutoff_weight and zero_yield_weight
+  - chan_events and chan_created
+- **Recording.** Done once, after all the physics is in (laws, free gas,
+  temperature). The commit message and the manifest reason say why.
+- **After recording.** Track recording lands next, and the compare must
+  stay byte-exact.
+- **Other references.**
+  - The Phase 1 and 2a compares run after every commit.
+  - `docs/data_inventory.md` must regenerate byte-identically after the
+    reader change.
+
+### F. Track recording, seed 20261024 (approved)
+
+- **Opt-in**, for histories with id below `n_track`.
+- **Memory.** Each recorded history owns a fixed range of slots. No two
+  batches share memory.
+- **Per event:**
+  - history, particle index in the family, parent index
+  - event code: source, collision + MT, surface, absorption, leak,
+    cutoff, zero-yield, banked or popped
+  - x, u, E, t and the region
+- **Isolation.** The recorder never draws a random number and never
+  touches a tally. Overflowing a history's slots sets its truncation flag.
+- **Test** (D7, 4 x 500):
+  - Recording on vs off: every tally and count array is byte-identical,
+    max draws included.
+  - Sanity checks:
+    - t is non-decreasing along each particle
+    - x stays within the slab
+    - E is constant between collisions
+    - each particle in a recorded family ends exactly once
+    - the number of particles in each family is 1 + created
+
+### G. GIF
+
+- `scripts/record_tracks.py` runs D7 with recording on and writes
+  `outputs/tracks_d7.npz` (gitignored).
+- `scripts/animate_tracks.py` reads only that file.
+- **Plot.**
+  - x = depth, with W / FLiBe / Fe shaded and labelled; y = log10 E.
+  - Frames at log-spaced times from 1e-11 s to about 1e-3 s.
+  - Each neutron is a dot with a fading trail.
+  - At most 60 families are drawn.
+- **Output.** `PillowWriter`, about 100 frames, target <= 3 MB (the size
+  is printed), plus a static PNG.
+- Python 3.9 compatible.
+
+### H. Reporting, balance, statistical budget
+
+- **Summary table:** the same conftest columns as Part 1.
+  - The max_draws column is filled for every new kind of history family:
+    D7 real-data families, H-1 with free gas, and the unit draws of the
+    law and free-gas tests.
+  - Zero-yield kills appear as a row of the balance.
+- **Balance**, exact:
+  `sources + created == absorbed + leak_left + leak_right + cutoff + zero_yield (+ lost)`.
+  - New: a per-region tally `zero_yield_weight [B, R]` and a counter
+    `K_ZERO_YIELD` (P2).
+  - It is asserted on real data in (g) and on D7.
+- **Statistical checks:** 50 now, plus 24 (f 10, g 6, free gas 4, kernel
+  shape 4), for 74 in total. The chance of at least one chance failure in
+  a full run is about 18%.
+
+### Decisions (approved 2026-10-01; conditions at the top of this section)
+
+| # | Question | Recommendation (approved) |
+|---|---|---|
+| P1 | D7 temperatures | W and Fe at 293.6 K. FLiBe at 900 K data, with the Janz density at 900 K (1.973 g/cm^3). This removes the 2a density / data-temperature mismatch for this problem and puts per-material temperature in the reference. Alternative: everything at 293.6 K with the 2a FLiBe (973 K density). |
+| P2 | Zero-yield kills (MT 5 with y = 0, or n = 0 sampled) | A separate per-region tally, counter and balance term, not absorption. OpenMC scores the event as a scatter whose weight drops to 0. |
+| P3 | `free_gas` switch | Yes. A diagnostic only; it lets the hydrogen script re-derive the "before" number exactly. |
+| P4 | (a2) p-only agreement check | Yes. Deterministic, and no expectation changes. |
+| P5 | Free-gas kernel-shape test, new seed 20261025 | Yes. |
+| P6 | (g) via direct calls plus kernel counters | Yes. |
+
+New seeds fixed here, before any test exists: 20261025 (kernel shape) and
+20261026 (dispatch and temperature).
+
+### Commits (on `phase-2b`, no attribution trailers)
+
+1. This plan section and the free-gas correction, marked approved.
+2. `scripts/law_inventory.py` and `docs/law_inventory.md`.
+3. Reader: correlated, continuous tabular, applicability, `Tabulated1D`
+   yields, strict refusal. `docs/data_inventory.md` regenerates
+   byte-identically.
+4. Packing, samplers and D2 yields; test (f); the (a2) p-only check.
+5. Kernel: new laws wired in, zero-yield tally, balance, unconditional
+   refusal of unsupported laws; test (g).
+6. Per-material temperature, free gas, the switch and `K_FREE_GAS`; the
+   free-gas tests.
+7. Hydrogen script and its numbers.
+8. Regression harness (h) and its reference, recorded with `--reason`.
+9. Track recording and its test. The (h) compare stays byte-exact.
+10. GIF scripts and figures.
+11. Docs: deviations, README (including the synthetic (d) caveat), the
+    `synthetic.py` docstring, plan status. Summary table, then
+    **stop**.
+
+**Later, after the user's history rewrite (not now).** A provenance-only
+update, like Step 0:
+- The regression manifests (`tests/reference/`, `tests/reference_ce/`,
+  `tests/reference_kin/`) and this file record commit hashes.
+- Re-record each manifest with a provenance reason, and check that every
+  array is byte-identical.
+- Restore the `.npz` files, so that only `manifest.json` changes. Old
+  entries stay in each manifest's history.
+- Then update the hashes cited in the docs from the rewrite's commit map.
 
 ## Deviations from OpenMC (initial list for `docs/deviations_from_openmc.md`)
 
@@ -426,4 +939,9 @@ Anything else found during implementation is added when found.
     operation, steps 1-8 intact (119 tests pass, both regressions
     byte-exact), and the uncommitted step-9 files were inspected and their
     untested claims re-run.
-- [ ] Part 2 (awaiting approval of Part 1).
+- [x] Part 2 detailed plan approved 2026-10-01, with conditions ("Part 2
+      detailed plan" above). The free-gas test description was corrected
+      the same day, before any free-gas code or test existed.
+- [ ] Part 2 implementation (commits 2-11 of the Part 2 detailed plan).
+- [ ] Later, after the user's history rewrite: provenance-only update of
+      the regression manifests and of the hashes in this file.
