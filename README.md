@@ -42,6 +42,44 @@ data.
   gas-production data exist.
 - Plots of the key cross sections are in `docs/figures/`.
 
+### Phase 2b, Part 1: collision kinematics (elastic and discrete levels)
+
+A new continuous-energy kernel (`mcslab/transport_kin.py`, driver
+`mcslab/config_kin.py`) in which neutrons scatter, lose energy and
+multiply. It mirrors OpenMC v0.16.0's physics, cited in the code. The
+Phase 1 and Phase 2a kernels are unchanged.
+
+- **Collisions.** The nuclide is chosen in proportion to N sigma_t. Then
+  analog absorption (capture, (n,p), (n,a), Li-6 (n,t), ...) ends the
+  neutron. Otherwise an elastic or inelastic channel is chosen in
+  proportion to its cross section, in OpenMC's order and draw count.
+- **Elastic scattering.** Two-body kinematics with the tabulated CM angular
+  distribution, target at rest.
+- **Discrete inelastic levels (MT 51-90).** Two-body kinematics with the
+  level's Q. The CM energy comes from AWR and Q, so energy and momentum
+  are conserved to round-off. This is a documented deviation from
+  OpenMC, which uses the rounded stored parameters.
+- **Secondary neutrons.** Reactions with yield y > 1 bank y - 1 identical
+  copies, as OpenMC does. The bank is per history and LIFO, and
+  continues the history's random-number stream, so results stay
+  bit-identical however batches are split.
+- **Energy cutoff.** Defaults to the bottom of the data grid (1e-5 eV).
+  Killed weight is never dropped silently: it is tallied per region, is a
+  term in the exact neutron balance, triggers `EnergyCutoffWarning`, and is
+  shown in the test summary.
+- **Tallies.** The Phase 1 region and surface tallies, plus:
+  - a spectrum tally (track-length and collision estimators in energy bins)
+  - per-channel event and secondary counts
+  - counters for the neutron balance
+- **Synthetic nuclides** (`mcslab/synthetic.py`): constant cross sections,
+  chosen mass, isotropic CM. Used for the analytic tests.
+- **Not yet (Part 2):** correlated and continuous-tabular laws,
+  energy-dependent yields, and free-gas thermal motion. The driver refuses
+  problems that can reach an unimplemented law. That means every real
+  Fe/W problem above ~1 keV and Be/F/Li at fusion energies.
+
+`docs/deviations_from_openmc.md` lists every known difference from OpenMC.
+
 ## Nuclear data setup
 
 The data live outside the repository and are never committed.
@@ -64,6 +102,23 @@ tests skip and the Phase 1 tests run as before.
 ./venv/bin/python tests/test_regression_ce.py compare      # Phase 2a (CE) bit-identical regression
 ./venv/bin/python scripts/make_inventory.py                # regenerate docs/data_inventory.md
 ./venv/bin/python scripts/plot_xs.py                       # regenerate docs/figures/*.png
+```
+
+A kinematic run (Phase 2b), e.g. a synthetic scatterer:
+
+```python
+from mcslab import synthetic as S
+from mcslab.config_ce import MonoEnergetic
+from mcslab.config_kin import KinRunConfig, run_kin
+from mcslab.geometry import SlabGeometry
+from mcslab.sources import BeamSource
+
+x = S.nuclide("X", awr=12.0, elastic_b=4.0, capture_b=0.01)
+cfg = KinRunConfig(SlabGeometry([0.0, 10.0], [S.SyntheticMaterial("x", (("X", 0.1),))]),
+                   BeamSource(), MonoEnergetic(2.0e6), S.SyntheticLibrary({"X": x}),
+                   n_batches=20, histories_per_batch=1000, energy_cutoff=1.0e3)
+res = run_kin(cfg)
+print(res.balance())       # exact: source + created == absorbed + leaked + cutoff
 ```
 
 ## Tests: what they do and do not cover
@@ -103,6 +158,38 @@ tests skip and the Phase 1 tests run as before.
   kernel on real data: a W | void | FLiBe | Fe slab with a log-uniform
   1 keV-14.1 MeV source. Its reference (`tests/reference_ce/`) pins the
   sha256 of every data file it uses.
+
+- `tests/test_kinematics.py` covers Phase 2b Part 1. Seeds were fixed in
+  `docs/phase2b_plan.md` before the tests were written.
+  - **(a)** Elastic scattering off a target at rest, synthetic isotropic-CM
+    nuclide with A = 1, 12, 184. E' is uniform on [alpha E, E]
+    (chi-square) and the mean ln(E/E') is xi (3 SE). Per event,
+    E' = E((1+alpha) + (1-alpha) mu_cm)/2 to round-off, with mu_cm
+    replayed from the event's random number.
+  - **(a2)** The tabular-angle sampler on real tables (Fe56 and W184
+    elastic, at on-grid and between-grid energies) and on synthetic
+    histogram tables. Chi-square against probabilities computed from the
+    raw HDF5 files, plus an exact inverse-CDF replay (1.7e-15).
+  - **(b)** Slowing down in an infinite non-absorbing medium, through the
+    full kernel. Both flux estimators follow 1/(xi Sigma_s E): a
+    Hotelling T^2 test over 10 energy bins, for A = 1 (exact) and A = 12
+    (8 collision intervals below the source, where the Placzek transient
+    is bounded at 1.3e-8 by a deterministic solve in the test). Leakage
+    is asserted to be exactly 0.
+  - **(c)** Per-event energy and momentum conservation for all 98 discrete
+    levels of Fe56, Li7, F19 and W184 (real angle data), synthetic levels,
+    and elastic scattering: at most 7.4e-16 relative.
+  - **(d)** Exact integer neutron balance in a multiplying slab with
+    (n,2n) and (n,3n):
+    `sources + created == absorbed + leaked + cutoff`, per batch, with
+    every term cross-checked against an independent counter, and
+    `created == (y-1) x events` per channel.
+
+  Not covered yet: any law beyond tabular angle and level, thermal
+  physics, and any integral comparison on real data (Part 2).
+- `tests/test_reproducibility_kin.py`: the kinematic kernel is
+  bit-identical under repeated, split and reordered batch runs with
+  secondaries present. Bank overflow raises instead of dropping neutrons.
 
 ## Hand-checking cross sections against an independent source
 
@@ -155,9 +242,10 @@ above.
   approximately normal (at least 20 batches recommended).
 
 ### Phase 2a
-- **No scattering kinematics.** In the CE kernel every collision ends the
-  history, and a neutron keeps its source energy until it collides or
-  leaks. CE results are therefore uncollided-flux quantities only (Phase 2b).
+- **No scattering kinematics in the Phase 2a kernel.** In
+  `transport_ce.py` every collision ends the history, and a neutron keeps
+  its source energy until it collides or leaks. Its results are
+  uncollided-flux quantities only. The Phase 2b kernel adds kinematics.
 - **294 K cross sections only.** Other temperatures in the files are
   readable but unused, and there is no on-the-fly Doppler broadening.
 - **FLiBe temperature mismatch.** The default FLiBe density is the Janz
@@ -181,3 +269,43 @@ above.
   (see `docs/data_inventory.md`).
 - **FENDL-3.2** is supported by the reader in principle, but it has not been
   fetched or tested.
+
+### Phase 2b, Part 1
+- **No thermal treatment yet: the target is always at rest.** Neutrons do
+  not thermalise; they keep slowing down until the energy cutoff
+  (1e-5 eV) kills them. In weakly absorbing media this is most of the
+  neutrons. Example: a 30 cm slab of pure H-1 at 0.0708 g/cm^3 (294 K
+  cross sections), 1 MeV beam, 10 batches x 1000 histories, seed 3, loses
+  69.41% of the source weight to the cutoff.
+  - **Cause.** With the target at rest, no collision can raise a
+    neutron's energy. Hydrogen removes on average a factor e per
+    collision, so a neutron at 1 eV reaches 1e-5 eV in about 11.5
+    collisions, each with at most a 1.4% chance of capture.
+  - **With target motion** (Part 2's free gas, as in OpenMC), collisions
+    below a few kT raise the energy as often as they lower it. Neutrons
+    then settle into a thermal population near kT = 0.025 eV and end by
+    absorption or leakage instead.
+  - **Not a physical material.** 0.0708 g/cm^3 is the density of liquid
+    H2, and real hydrogen is cold and molecular, so its thermal
+    scattering would need S(alpha,beta) data. The 294 K data's elastic
+    cross section is already Doppler-broadened (1160 b at 1e-5 eV), but
+    broadening the cross section moves no energy. Only target motion in
+    the kinematics does.
+
+  Results below about 1 eV are not physical until Part 2 adds free-gas
+  scattering. The lost weight is always reported, never hidden.
+- **Only elastic, discrete levels and absorption.** Correlated angle-energy
+  and continuous-tabular laws, and energy-dependent yields, arrive in
+  Part 2. Until then the driver refuses problems that can reach them,
+  which rules out real W, Fe, Be, F and Li problems at fusion energies.
+- **Energy cutoff instead of extrapolating below the data grid.** This
+  deviates from OpenMC, which has a zero cutoff and extrapolates.
+- **No regression reference for the kinematic kernel yet.** It arrives with
+  Part 2 (test h). Until then its behaviour is pinned by the statistical
+  and exact tests only.
+- **(n,2n)-type secondaries are identical copies** of the outgoing neutron
+  (same energy and direction), as in OpenMC. Mean values are unaffected;
+  the copies are fully correlated.
+- **Validated with synthetic data and single-collision real-data checks
+  only.** No transport result on real materials has been compared with
+  anything yet.

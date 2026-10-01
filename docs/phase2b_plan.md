@@ -305,6 +305,21 @@ level.
    with kT from the file (`kTs/294K`) and resonance scattering off, as in
    OpenMC's defaults. Synthetic nuclides with kT = 0 keep the target at
    rest (this guard avoids OpenMC's division by kT).
+   **Hydrogen cutoff re-run (added 2026-09-30, at Part 1 review).**
+   - Once free gas is in, re-run the Part 1 illustration with identical
+     inputs: pure H-1 at 0.0708 g/cm^3, slab [0, 30] cm, 1 MeV beam at
+     x = 0, 10 batches x 1000 histories, seed 3, default energy cutoff
+     (1e-5 eV).
+   - Report the cutoff fraction before and after, with the full balance.
+   - Before (Part 1, target at rest, commit `cf0a925`): source 10000,
+     absorbed 1013, leaked left 1421, leaked right 625, cutoff 6941
+     (0.6941), residual 0.
+   - Expected after: the cutoff becomes the sub-1e-5 eV tail of a 294 K
+     thermal population, i.e. near zero, with absorption and leakage
+     taking up the difference.
+   - This is a diagnostic comparison, not a statistical pass/fail test,
+     so the seed is simply the one used before. The result goes into the
+     Part 2 summary, the README and `docs/deviations_from_openmc.md`.
 4. Tests (f), (g) and free gas.
 5. Regression reference (h): a new harness `tests/test_regression_kin.py`
    with its own `tests/reference_kin/`, pinning data sha256s like the CE
@@ -393,5 +408,22 @@ Anything else found during implementation is added when found.
       (`da7822a`, Phase 1 only) not touched.
 - [x] Baseline: Phase 1 and Phase 2a regression compares pass byte-exact.
 - [x] Plan approved (2026-09-30). `main` fast-forwarded to `397ff86`.
-- [ ] Part 1 (commits 2-9 above).
-- [ ] Part 2.
+- [x] Part 1 (2026-09-30):
+  - [x] 2. Step 0, `ddfa2a9`. Arrays and `reference.npz` byte-identical
+        to before; only `manifest.json` changed.
+  - [x] 3. Reader, `210238c`. Inventory regenerates byte-identically.
+  - [x] 4. Samplers and (a2), `3fdec1b`.
+  - [x] 5. Collision physics, `f78786e`.
+  - [x] 6. Kernel, driver, bank, synthetic nuclides, reproducibility
+        test, `e2292f4`.
+  - [x] 7. Tests (a), (b), `ef814ff`.
+  - [x] 8. Tests (c), (d), `cf0a925`. Adds the K_BORN_BELOW_CUTOFF
+        counter.
+  - [x] 9. Docs: `docs/deviations_from_openmc.md`, README,
+        this status, and the hydrogen re-run added to Part 2.
+  - Note: a network drop interrupted the session during step 9. The
+    repository was audited before continuing: no lock or in-progress git
+    operation, steps 1-8 intact (119 tests pass, both regressions
+    byte-exact), and the uncommitted step-9 files were inspected and their
+    untested claims re-run.
+- [ ] Part 2 (awaiting approval of Part 1).
