@@ -58,14 +58,24 @@ def flibe_density(temperature_K: float) -> float:
 @dataclass(frozen=True)
 class CEMaterial:
     """A material as (nuclide, atom fraction) pairs plus a mass density.
-    Atom fractions are per atom of material and must sum to 1."""
+    Atom fractions are per atom of material and must sum to 1.
+
+    temperature: K, used by the kinematic driver to select the data
+    temperature (OpenMC's NEAREST rule) and hence kT for free-gas
+    scattering. None means the run's default (293.6 K). It does not change
+    the density: set that explicitly (e.g. flibe(temperature_K=...)). The
+    Phase 2a driver refuses a material whose temperature selects data other
+    than the run's single temperature."""
     name: str
     density_g_cm3: float
     atom_fractions: Tuple[Tuple[str, float], ...]
+    temperature: Optional[float] = None
 
     def __post_init__(self):
         if self.density_g_cm3 < 0.0:
             raise ValueError(f"{self.name}: negative density")
+        if self.temperature is not None and not self.temperature > 0.0:
+            raise ValueError(f"{self.name}: temperature must be > 0 K")
         total = sum(f for _, f in self.atom_fractions)
         if self.atom_fractions and abs(total - 1.0) > 1e-12:
             raise ValueError(f"{self.name}: atom fractions sum to {total}, not 1")

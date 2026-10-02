@@ -16,7 +16,7 @@ from .collision import pack_physics
 from .config import Results
 from .config_ce import LogUniform, MonoEnergetic
 from .geometry import SlabGeometry
-from .nucdata import DEFAULT_TEMPERATURE, temperature_key
+from .nucdata import DEFAULT_TEMPERATURE_K, TEMPERATURE_TOLERANCE, temperature_key
 from .rng import STRIDE, validate_seed
 from .sources import BeamSource, IsotropicPlaneSource
 from .transport_kin import run_batches_kin
@@ -43,6 +43,16 @@ class KinRunConfig:
         used (1e-5 eV for ENDF/B-VIII.0), below which no lookup is possible.
     energy_edges: increasing bin edges (eV) for the spectrum tally. None
         means one bin [energy_cutoff, common grid maximum).
+    temperature: K, for materials without their own `temperature`
+        (OpenMC's default 293.6 K). Each material's temperature selects the
+        data temperature of its nuclides by OpenMC's NEAREST rule within
+        temperature_tolerance (nucdata.nearest_temperature); that group's
+        kT is used for free-gas scattering. A string (e.g. "294K") names a
+        data group directly.
+    free_gas_threshold: target at rest iff E >= threshold * kT and awr > 1
+        (OpenMC's free_gas_threshold, default 400).
+    free_gas: False disables target motion everywhere (a diagnostic switch,
+        mcslab only; it reproduces Part 1 exactly).
     """
     geometry: SlabGeometry
     source: Source
@@ -51,10 +61,13 @@ class KinRunConfig:
     n_batches: int = 100
     histories_per_batch: int = 10_000
     seed: int = 1
-    temperature: str = DEFAULT_TEMPERATURE
+    temperature: Union[float, str] = DEFAULT_TEMPERATURE_K
     energy_cutoff: Optional[float] = None
     energy_edges: Optional[Tuple[float, ...]] = None
     bank_capacity: int = 10_000     # OpenMC's default max_secondaries
+    temperature_tolerance: float = TEMPERATURE_TOLERANCE
+    free_gas_threshold: float = 400.0
+    free_gas: bool = True
 
     def __post_init__(self):
         if self.n_batches < 2:
@@ -138,19 +151,50 @@ def _load(library, name: str, temperature: str):
     return _CACHE[key][1]
 
 
+def data_temperature(config: KinRunConfig, material, name: str) -> str:
+    """Data temperature group of nuclide `name` in `material`: the
+    material's own temperature, else the run's, by OpenMC's NEAREST rule (a
+    string names the group directly)."""
+    T = getattr(material, "temperature", None)
+    T = config.temperature if T is None else T
+    if isinstance(T, str):
+        return temperature_key(T)
+    return config.library.select_temperature(name, float(T), config.temperature_tolerance)
+
+
 def pack_problem(config: KinRunConfig):
-    """-> (bounds, mat_of_region, PackedXS, PackedPhysics, {name: Nuclide})."""
+    """-> (bounds, mat_of_region, PackedXS, PackedPhysics, {label: Nuclide}).
+
+    Each (nuclide, data temperature) pair is packed as its own entry, with
+    its own grid, cross sections and kT. Its label is the nuclide name, or
+    "name@group" (e.g. "Li7@900K") when the problem uses that nuclide at
+    more than one data temperature."""
     g = config.geometry
     unique, mat_of_region = [], []
     for m in g.region_materials:
         if m not in unique:
             unique.append(m)
         mat_of_region.append(unique.index(m))
-    T_key = temperature_key(config.temperature)
-    names = sorted({n for m in unique for n in m.nuclide_names})
-    nuclides = {n: _load(config.library, n, T_key) for n in names}
-    awr = {n: nuc.awr for n, nuc in nuclides.items()}
-    packed = pack([m.number_densities(awr) for m in unique], nuclides)
+    keys = [[(n, data_temperature(config, m, n)) for n in m.nuclide_names] for m in unique]
+    groups = {}
+    for ent in keys:
+        for n, key in ent:
+            groups.setdefault(n, set()).add(key)
+
+    def label(n, key):
+        return n if len(groups[n]) == 1 else f"{n}@{key}"
+
+    nuclides = {}
+    for ent in keys:
+        for n, key in ent:
+            if label(n, key) not in nuclides:
+                nuclides[label(n, key)] = _load(config.library, n, key)
+    compositions = []
+    for m, ent in zip(unique, keys):
+        lab = dict((n, label(n, key)) for n, key in ent)
+        awr = {n: nuclides[lab[n]].awr for n in lab}
+        compositions.append(tuple((lab[n], d) for n, d in m.number_densities(awr)))
+    packed = pack(compositions, nuclides)
     phys = pack_physics(packed.nuclide_names, nuclides)
     return (np.asarray(g.bounds, dtype=np.float64),
             np.asarray(mat_of_region, dtype=np.int64), packed, phys, nuclides)
@@ -213,7 +257,9 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
     run_batches_kin(b0, b1, config.histories_per_batch, validate_seed(config.seed),
                     bounds, mat_of_region,
                     p.egrid, p.e_off, p.tot, p.absn, p.m_off, p.mat_nuc, p.mat_dens,
-                    phys.nuc_awr, phys.ch_off, phys.ch_int, phys.ch_q, phys.chxs,
+                    phys.nuc_awr, phys.nuc_kT, float(config.free_gas_threshold),
+                    bool(config.free_gas),
+                    phys.ch_off, phys.ch_int, phys.ch_q, phys.chxs,
                     phys.ip, phys.fp,
                     src_type, src_x, src_region, e_type, e_lo, e_hi,
                     e_cut, edges, int(config.bank_capacity),

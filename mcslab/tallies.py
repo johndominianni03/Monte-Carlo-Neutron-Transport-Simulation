@@ -60,10 +60,11 @@ K_INELASTIC = 10     # non-elastic scatters (any multiplicity)
 K_MAX_BANK = 11      # largest secondary-bank occupancy seen in the batch
 K_BORN_BELOW_CUTOFF = 12  # secondaries created below the cutoff (also in K_CUTOFF)
 K_ZERO_YIELD = 13    # particles ended by a zero-yield event (multiplicity 0)
-N_COUNTS = 14
+K_FREE_GAS = 14      # elastic scatters with free-gas target motion
+N_COUNTS = 15
 COUNT_NAMES = ("max_draws", "lost", "source", "created", "absorbed", "leak_left",
                "leak_right", "cutoff", "collisions", "elastic", "inelastic", "max_bank",
-               "born_below_cutoff", "zero_yield")
+               "born_below_cutoff", "zero_yield", "free_gas")
 
 
 def allocate(n_batches, n_regions):

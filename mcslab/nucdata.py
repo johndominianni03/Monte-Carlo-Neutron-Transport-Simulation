@@ -63,6 +63,7 @@ table) raises instead of being guessed.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,6 +75,14 @@ import numpy as np
 DATA_ENV = "MCSLAB_DATA"
 SUPPORTED_MAJOR_VERSION = 3
 DEFAULT_TEMPERATURE = "294K"
+
+# Temperature selection, as OpenMC v0.16.0 does it by default:
+# include/openmc/constants.h K_BOLTZMANN; src/settings.cpp
+# temperature_default {293.6}, temperature_tolerance {10.0},
+# temperature_method NEAREST.
+K_BOLTZMANN = 8.617333262e-5          # eV/K
+DEFAULT_TEMPERATURE_K = 293.6
+TEMPERATURE_TOLERANCE = 10.0          # K
 
 
 def data_dir(path: Optional[Union[str, Path]] = None) -> Path:
@@ -97,6 +106,30 @@ def temperature_key(temperature: Union[str, int, float]) -> str:
     if isinstance(temperature, str):
         return temperature if temperature.endswith("K") else f"{temperature}K"
     return f"{int(round(temperature))}K"
+
+
+def nearest_temperature(kts: Dict[str, float], T: float,
+                        tolerance: float = TEMPERATURE_TOLERANCE) -> str:
+    """The data temperature group (e.g. "294K") for a material at T kelvin,
+    by OpenMC's NEAREST rule (src/nuclide.cpp, Nuclide constructor): the
+    available temperatures are round(kT / k_B) of every `kTs` dataset,
+    sorted; the first one with the smallest |T_avail - T| is taken (ties go
+    to the lower temperature), and it is refused unless that difference is
+    < tolerance. kts maps group name -> kT (eV)."""
+    # std::round rounds halves away from zero (Python's round would not)
+    avail = sorted((float(math.floor(kT / K_BOLTZMANN + 0.5)), key) for key, kT in kts.items())
+    if not avail:
+        raise ValueError("no temperatures available")
+    best, best_key, best_d = None, None, math.inf
+    for t_avail, key in avail:
+        d = abs(t_avail - T)
+        if d < best_d:
+            best, best_key, best_d = t_avail, key, d
+    if not abs(best - T) < tolerance:
+        raise ValueError(f"no data at or near {T} K (nearest {best:g} K, tolerance "
+                         f"{tolerance:g} K; available "
+                         f"{', '.join(f'{t:g}' for t, _ in avail)} K)")
+    return best_key
 
 
 def _str(value) -> str:
@@ -607,3 +640,15 @@ class Library:
              distributions: bool = False) -> Nuclide:
         return read_nuclide(self.nuclide_path(name), temperature, self.label,
                             distributions)
+
+    def kts(self, name: str) -> Dict[str, float]:
+        """Temperature group name -> kT (eV) for one nuclide."""
+        with h5py.File(self.nuclide_path(name), "r") as f:
+            (nuc,) = list(f)
+            return {k: float(f[nuc]["kTs"][k][()]) for k in f[nuc]["kTs"]}
+
+    def select_temperature(self, name: str, T: float,
+                           tolerance: float = TEMPERATURE_TOLERANCE) -> str:
+        """Data temperature group for nuclide `name` in a material at T
+        kelvin (OpenMC's NEAREST rule; see nearest_temperature)."""
+        return nearest_temperature(self.kts(name), float(T), tolerance)

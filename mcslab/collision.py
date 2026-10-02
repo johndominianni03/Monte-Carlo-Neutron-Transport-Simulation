@@ -280,6 +280,104 @@ def elastic_scatter(E, u, v, w, awr, ip, fp, prod, rng):
 
 
 @njit(cache=True)
+def sample_cxs_target_velocity(awr, E, u, v, w, kT, rng):
+    """OpenMC physics.cpp sample_cxs_target_velocity: the target velocity of
+    a free-gas nucleus at temperature kT for the constant-cross-section
+    (cxs) model, in units v = sqrt(E). Each rejection-loop iteration draws
+    r1, r2, the branch (3), cos for the y^2 exp(-y^2) branch ([1]), mu (1)
+    and the acceptance (1); then rotate_angle draws phi (1).
+
+    Rejection sampling on (beta v_t, mu) with weight proportional to the
+    relative speed, as in OpenMC: beta v_t from y exp(-y) (C45) with
+    probability alpha, else from y^2 exp(-y^2) (C61), accepted with
+    probability |v_n - v_t| / (v_n + v_t). A draw of exactly 0 gives
+    log(0) = -inf and a NaN acceptance, which rejects, as in OpenMC."""
+    beta_vn = math.sqrt(awr * E / kT)
+    alpha = 1.0 / (1.0 + math.sqrt(math.pi) * beta_vn / 2.0)
+    while True:
+        r1 = prn(rng)
+        r2 = prn(rng)
+        if prn(rng) < alpha:
+            beta_vt_sq = -_log(r1 * r2)
+        else:
+            c = math.cos(math.pi / 2.0 * prn(rng))
+            beta_vt_sq = -_log(r1) - _log(r2) * c * c
+        beta_vt = math.sqrt(beta_vt_sq)
+        mu = -1.0 + 2.0 * prn(rng)
+        accept_prob = (math.sqrt(beta_vn * beta_vn + beta_vt_sq - 2.0 * beta_vn * beta_vt * mu)
+                       / (beta_vn + beta_vt))
+        if prn(rng) < accept_prob:
+            break
+    vt = math.sqrt(beta_vt_sq * kT / awr)
+    tx, ty, tz = rotate_angle(u, v, w, mu, rng)
+    return vt * tx, vt * ty, vt * tz
+
+
+@njit(cache=True)
+def _log(x):
+    """log with log(0) = -inf (C semantics) instead of an exception."""
+    if x == 0.0:
+        return -np.inf
+    return math.log(x)
+
+
+@njit(cache=True)
+def elastic_scatter_free_gas(E, u, v, w, awr, kT, ip, fp, prod, rng):
+    """OpenMC physics.cpp elastic_scatter with a moving target: the target
+    velocity first (sample_cxs_target_velocity), then the CM cosine sampled
+    at the lab energy E, the rotation in CM and the transform back.
+    Returns (E', u', v', w', mu_lab)."""
+    vel = math.sqrt(E)
+    vnx = vel * u
+    vny = vel * v
+    vnz = vel * w
+    vtx, vty, vtz = sample_cxs_target_velocity(awr, E, u, v, w, kT, rng)
+    ap1 = awr + 1.0
+    vcx = (vnx + awr * vtx) / ap1
+    vcy = (vny + awr * vty) / ap1
+    vcz = (vnz + awr * vtz) / ap1
+    vnx -= vcx
+    vny -= vcy
+    vnz -= vcz
+    vel = math.sqrt(vnx * vnx + vny * vny + vnz * vnz)
+    law = D.product_law(ip, prod)
+    mu_cm = D.sample_mu(ip, fp, ip[law + 1], E, rng)
+    ux, uy, uz = rotate_angle(vnx / vel, vny / vel, vnz / vel, mu_cm, rng)
+    vnx = vel * ux + vcx
+    vny = vel * uy + vcy
+    vnz = vel * uz + vcz
+    E_out = vnx * vnx + vny * vny + vnz * vnz
+    vel = math.sqrt(E_out)
+    mu_lab = (u * vnx + v * vny + w * vnz) / vel
+    if abs(mu_lab) > 1.0:
+        mu_lab = math.copysign(1.0, mu_lab)
+    return E_out, vnx / vel, vny / vel, vnz / vel, mu_lab
+
+
+@njit(cache=True)
+def uses_free_gas(E, awr, kT, threshold, free_gas):
+    """OpenMC physics.cpp sample_target_velocity (non-resonant nuclide): the
+    target is at rest iff E >= threshold * kT and awr > 1; otherwise the cxs
+    free-gas sampler is used. So H-1 (awr 0.99917) always gets free gas.
+    mcslab additions: kT = 0 (synthetic nuclides) keeps the target at rest,
+    avoiding OpenMC's division by kT, and free_gas = False (a diagnostic
+    switch) disables target motion everywhere."""
+    return free_gas and kT > 0.0 and (E < threshold * kT or awr <= 1.0)
+
+
+@njit(cache=True)
+def elastic_collision(E, u, v, w, awr, kT, threshold, free_gas, ip, fp, prod, rng):
+    """Elastic scattering as the kernel does it. A target at rest calls the
+    Part 1 elastic_scatter unchanged (bit-identical results and draws).
+    Returns (E', u', v', w', mu_lab, 1 if free gas was used else 0)."""
+    if uses_free_gas(E, awr, kT, threshold, free_gas):
+        E2, u2, v2, w2, mu = elastic_scatter_free_gas(E, u, v, w, awr, kT, ip, fp, prod, rng)
+        return E2, u2, v2, w2, mu, 1
+    E2, u2, v2, w2, mu = elastic_scatter(E, u, v, w, awr, ip, fp, prod, rng)
+    return E2, u2, v2, w2, mu, 0
+
+
+@njit(cache=True)
 def cm_to_lab(E_in, E_cm, mu_cm, awr):
     """OpenMC physics.cpp inelastic_scatter, CM -> lab for a neutron of CM
     energy E_cm and CM cosine mu_cm (target at rest)."""

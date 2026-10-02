@@ -87,6 +87,14 @@ def pack_problem(config: CERunConfig):
             unique.append(m)
         mat_of_region.append(unique.index(m))
     T_key = temperature_key(config.temperature)
+    for m in unique:
+        # Phase 2a runs use one data temperature; a per-material temperature
+        # (used by the kinematic driver) must not be silently ignored.
+        T = getattr(m, "temperature", None)
+        for n in (m.nuclide_names if T is not None else ()):
+            if config.library.select_temperature(n, T) != T_key:
+                raise ValueError(f"{m.name}: temperature {T} K selects data other than "
+                                 f"the run's {T_key}; Phase 2a runs use one temperature")
     names = sorted({n for m in unique for n in m.nuclide_names})
     nuclides = {n: _load(config.library, n, T_key) for n in names}
     awr = {n: nuc.awr for n, nuc in nuclides.items()}

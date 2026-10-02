@@ -3,16 +3,26 @@ HDF5 reader returns. They go through exactly the same packing and kernels
 as real nuclides.
 
 A synthetic nuclide has constant (energy-independent) cross sections on a
-grid from 1e-5 eV to 20 MeV and isotropic CM angular distributions. Its
-kT is 0, meaning 0 K: the target is at rest. It can have:
+grid from 1e-5 eV to 20 MeV and isotropic CM angular distributions. Its kT
+defaults to 0, meaning 0 K: the target is always at rest. With kT > 0, the
+kinematic kernel applies free-gas scattering below 400 kT (or always for
+A <= 1), as for real data; kT is a property of the synthetic nuclide, not
+of the material. An elastic cross section may also be given as a table on
+its own grid (elastic_table), e.g. the free-gas broadened cross section of
+a constant free-atom one. It can have:
 
   - elastic scattering (MT 2), always present;
   - capture (MT 102): no outgoing neutron, so it is an absorption;
   - discrete levels (MT 51..): level law, Q < 0, yield 1;
   - multiplying reactions (e.g. MT 16 with yield 2, MT 17 with yield 3),
     modelled as a level-type two-body law with the given Q. This is not
-    realistic (n,2n) physics. It exists to exercise the secondary bank and
-    the neutron balance, which do not depend on the law.
+    realistic (n,2n) physics, and it does not conserve energy: each of the
+    y identical copies gets the full two-body energy, so a family carries
+    more energy than E + Q (14.1 MeV on A = 9 with Q = -2 MeV: 2 x 9.76 =
+    19.5 MeV out of 12.1 MeV). The secondaries then stay above threshold
+    and multiply again, so the multiplication of test (d) (1.31 secondaries
+    per source) is not physical. It exists to exercise the secondary bank
+    and the neutron balance, which do not depend on the law.
 
 A reaction with Q < 0 is exactly 0 up to its kinematic threshold
 -Q (A+1)/A (a grid point, as in real data, where every reaction's first
@@ -42,18 +52,31 @@ def _neutron_product(yield_value: float, level: N.LevelInelastic = None) -> N.Pr
 
 
 def nuclide(name: str, awr: float, elastic_b: float, capture_b: float = 0.0,
-            reactions: Sequence[Tuple[int, float, float, int]] = ()) -> N.Nuclide:
+            reactions: Sequence[Tuple[int, float, float, int]] = (),
+            kT: float = 0.0, elastic_table=None) -> N.Nuclide:
     """A synthetic nuclide.
 
     reactions: (MT, Q in eV (< 0), sigma in b, neutron yield) for each
     non-elastic neutron-emitting reaction, e.g. (51, -1.0e6, 0.5, 1) for a
-    level or (16, -5.0e6, 0.2, 2) for an (n,2n)."""
+    level or (16, -5.0e6, 0.2, 2) for an (n,2n).
+    kT: eV; > 0 enables free-gas elastic scattering (see the module
+    docstring).
+    elastic_table: optional (energies, barns) on a grid spanning
+    [1e-5 eV, 20 MeV], used instead of the constant elastic_b; the grid
+    then also carries the reactions' threshold points."""
+    if not kT >= 0.0:
+        raise ValueError("kT must be >= 0")
     thresholds = []
     for mt, q, _, _ in reactions:
         if not q < 0.0:
             raise ValueError(f"MT {mt}: synthetic reactions need Q < 0")
         thresholds.append(-q * (awr + 1.0) / awr)
     points = {E_MIN, E_MAX}
+    if elastic_table is not None:
+        e_tab, s_tab = (np.asarray(a, dtype=np.float64) for a in elastic_table)
+        if e_tab[0] != E_MIN or e_tab[-1] != E_MAX or (np.diff(e_tab) <= 0.0).any():
+            raise ValueError("elastic_table must be strictly increasing on [1e-5, 2e7] eV")
+        points.update(e_tab.tolist())
     for thr in thresholds:
         if not E_MIN < thr < E_MAX / (1.0 + _STEP):
             raise ValueError(f"threshold {thr} eV outside the synthetic grid")
@@ -61,8 +84,10 @@ def nuclide(name: str, awr: float, elastic_b: float, capture_b: float = 0.0,
     grid = np.array(sorted(points), dtype=np.float64)
 
     rx: Dict[int, N.Reaction] = {}
-    rx[2] = N.Reaction(2, "(n,elastic)", 0.0, True, False, 0,
-                       np.full(grid.size, float(elastic_b)), (_neutron_product(1.0),))
+    elastic = (np.full(grid.size, float(elastic_b)) if elastic_table is None
+               else np.interp(grid, e_tab, s_tab))
+    rx[2] = N.Reaction(2, "(n,elastic)", 0.0, True, False, 0, elastic,
+                       (_neutron_product(1.0),))
     if capture_b > 0.0:
         rx[102] = N.Reaction(102, "(n,gamma)", 0.0, False, False, 0,
                              np.full(grid.size, float(capture_b)), ())
@@ -75,8 +100,8 @@ def nuclide(name: str, awr: float, elastic_b: float, capture_b: float = 0.0,
         rx[mt] = N.Reaction(mt, f"synthetic MT {mt}", float(q), True, False, i0, xs,
                             (_neutron_product(y, level),))
     return N.Nuclide(name=name, Z=0, A=int(round(awr)), metastable=0, awr=float(awr),
-                     temperature="0K", kT=0.0, energy=grid, reactions=rx,
-                     path="", library="synthetic")
+                     temperature=f"synthetic kT={kT:g} eV", kT=float(kT), energy=grid,
+                     reactions=rx, path="", library="synthetic")
 
 
 @dataclass(eq=False)
@@ -88,12 +113,17 @@ class SyntheticLibrary:
     def load(self, name, temperature=None, distributions=False):
         return self.nuclides[name]
 
+    def select_temperature(self, name, T, tolerance=None):
+        """Synthetic nuclides exist at one (their own) temperature."""
+        return self.nuclides[name].temperature
+
 
 @dataclass(frozen=True)
 class SyntheticMaterial:
     """A material given directly as (nuclide, atoms per barn-cm) pairs."""
     name: str
     atom_densities: Tuple[Tuple[str, float], ...] = field(default=())
+    temperature: float = None    # K; accepted, but synthetic data have one temperature
 
     @property
     def nuclide_names(self):

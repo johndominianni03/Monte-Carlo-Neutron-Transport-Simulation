@@ -12,6 +12,12 @@ are transported after their parent dies, continuing the history's random
 number stream (OpenMC particle.cpp event_check_limit_and_revive). A history
 family's results therefore depend on (master_seed, history id) only.
 
+Target motion. Elastic scattering uses OpenMC's free-gas (cxs) model when
+E < free_gas_threshold * kT or awr <= 1 (collision.elastic_collision), with
+kT that of the nuclide's data temperature, selected per material. Otherwise,
+and for kT = 0 synthetic nuclides, the target is at rest. Inelastic
+channels always see a target at rest, as in OpenMC.
+
 Multiplicity (approved deviation D2). A channel's yield y at the incident
 energy gives n outgoing neutrons (collision.multiplicity): n >= 2 banks
 n - 1 copies; n = 0 ends the neutron (a zero-yield event, e.g. Fe or W
@@ -48,6 +54,9 @@ Random-number consumption per event (part of the regression contract):
   collision       : nuclide 1; absorption 1 if sigma_a > 0 for that
                     nuclide; scatter channel 1; then
                     elastic (target at rest): angle 2 (isotropic 1) + phi 1
+                    elastic (free gas): per rejection-loop iteration
+                      3 + [1] + 2, then target direction 1, then angle
+                      2 (isotropic 1) + phi 1
                     other channels: applicability 1 (only if the product
                     has several laws), then the law:
                       level:              angle 2 (isotropic 1)
@@ -67,8 +76,8 @@ from .sources import sample_source
 from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED,
                       K_BORN_BELOW_CUTOFF, K_COLLISIONS, K_CREATED, K_CUTOFF, K_ELASTIC,
                       K_INELASTIC, K_LEAK_LEFT, K_LEAK_RIGHT, K_LOST, K_MAX_BANK,
-                      K_MAX_DRAWS, K_SOURCE, K_ZERO_YIELD, NEG, POS, SPEC_COLL, SPEC_TL,
-                      TRACK_LENGTH)
+                      K_FREE_GAS, K_MAX_DRAWS, K_SOURCE, K_ZERO_YIELD, NEG, POS, SPEC_COLL,
+                      SPEC_TL, TRACK_LENGTH)
 from .transport_ce import sample_energy
 from .xs import grid_locate, interp_at
 
@@ -126,7 +135,8 @@ def macro_total(m, E, egrid, e_off, tot, m_off, mat_nuc, mat_dens, ci, cf, ct):
 @njit(cache=True)
 def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           egrid, e_off, tot, absn, m_off, mat_nuc, mat_dens,
-                          nuc_awr, ch_off, ch_int, ch_q, chxs, ip, fp,
+                          nuc_awr, nuc_kT, fg_threshold, free_gas,
+                          ch_off, ch_int, ch_q, chxs, ip, fp,
                           src_type, src_x, src_region, e_type, e_lo, e_hi,
                           e_cut, spec_edges,
                           reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
@@ -199,9 +209,11 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                 if prod < 0:
                     raise RuntimeError("sampled a reaction whose law is not implemented")
                 if c == ch_off[k]:
-                    E, u, v, w, mu_lab = C.elastic_scatter(E, u, v, w, nuc_awr[k],
-                                                           ip, fp, prod, rng)
+                    E, u, v, w, mu_lab, fg = C.elastic_collision(
+                        E, u, v, w, nuc_awr[k], nuc_kT[k], fg_threshold, free_gas,
+                        ip, fp, prod, rng)
                     cnt[K_ELASTIC] += 1
+                    cnt[K_FREE_GAS] += fg
                     n_out = 1
                 else:
                     E, u, v, w, mu_lab, n_out = C.inelastic_scatter(
@@ -288,7 +300,8 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
 def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                     bounds, mat_of_region,
                     egrid, e_off, tot, absn, m_off, mat_nuc, mat_dens,
-                    nuc_awr, ch_off, ch_int, ch_q, chxs, ip, fp,
+                    nuc_awr, nuc_kT, fg_threshold, free_gas,
+                    ch_off, ch_int, ch_q, chxs, ip, fp,
                     src_type, src_x, src_region, e_type, e_lo, e_hi,
                     e_cut, spec_edges, bank_capacity,
                     region_sums, surface_sums, spectrum, cutoff_weight, counts,
@@ -330,7 +343,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
             draws, lost = transport_history_kin(
                 first + h, master_seed, bounds, mat_of_region,
                 egrid, e_off, tot, absn, m_off, mat_nuc, mat_dens,
-                nuc_awr, ch_off, ch_int, ch_q, chxs, ip, fp,
+                nuc_awr, nuc_kT, fg_threshold, free_gas,
+                ch_off, ch_int, ch_q, chxs, ip, fp,
                 src_type, src_x, src_region, e_type, e_lo, e_hi,
                 e_cut, spec_edges,
                 reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
