@@ -24,6 +24,9 @@ NUCLIDES = ["H1", "Fe54", "Fe56", "Fe57", "Fe58", "W180", "W182", "W183", "W184"
 E14 = 14.1e6
 OUT = os.path.join(REPO, "docs", "data_inventory.md")
 FIG_DIR = os.path.join(REPO, "docs", "figures")
+# the cross-section figures written by scripts/plot_xs.py (other figures in
+# docs/figures, e.g. the track animation, are not nuclear-data figures)
+XS_FIGURES = ("fe56_total.png", "tritium_production.png", "be9_n2n.png", "overview.png")
 SPECIAL = {301: "heating", 901: "heating-local", 444: "damage-energy",
            203: "(n,Xp)", 204: "(n,Xd)", 205: "(n,Xt)", 206: "(n,X3He)", 207: "(n,Xa)"}
 
@@ -176,13 +179,13 @@ def main():
         w(f"| {n} | " + " | ".join(cells) + " |")
     w("")
 
-    if os.path.isdir(FIG_DIR) and os.listdir(FIG_DIR):
+    figures = [fn for fn in sorted(XS_FIGURES) if os.path.isfile(os.path.join(FIG_DIR, fn))]
+    if figures:
         w("## Figures")
         w("")
-        for fn in sorted(os.listdir(FIG_DIR)):
-            if fn.endswith(".png"):
-                w(f"![{fn}](figures/{fn})")
-                w("")
+        for fn in figures:
+            w(f"![{fn}](figures/{fn})")
+            w("")
 
     # ------------------------------------------------------------------ per nuclide
     w("## Reactions per nuclide")

@@ -942,6 +942,40 @@ Anything else found during implementation is added when found.
 - [x] Part 2 detailed plan approved 2026-10-01, with conditions ("Part 2
       detailed plan" above). The free-gas test description was corrected
       the same day, before any free-gas code or test existed.
-- [ ] Part 2 implementation (commits 2-11 of the Part 2 detailed plan).
+- [x] Part 2 implementation (2026-10-01):
+  - [x] 1. Plan, approved, with the free-gas correction: `d51b5c3`.
+  - [x] 2. Law inventory script and `docs/law_inventory.md`: `f994c59`.
+  - [x] 3. Reader for law 61, law 4, applicability and `Tabulated1D`
+        yields: `a2ff6af`.
+        - `docs/data_inventory.md` regenerates byte-identically.
+        - Found: 1275 outgoing-energy tables repeat their last point, with
+          zero mass after c = 1. They are accepted, and recorded in the
+          inventory.
+  - [x] 4. Samplers, D2 yields, test (f) and the (a2) p-only check:
+        `4f31bde`.
+        - OpenMC's last-bin angle-table quirk (`c_k1 == c_k`) is mirrored.
+        - The law-frame mu may exceed 1 by about 1e-7, as in OpenMC (2.6e-8
+          observed, bound 1e-6).
+        - Chi-square cells expecting < 5 events are merged by a fixed rule.
+          Only Be9 MT 16 needed it, one cell per E row. The rule was added
+          after the expected-count assertion failed, before Be9's
+          statistic was ever computed. The other 8 cases were unchanged.
+  - [x] 5. Kernel wiring, zero-yield tally (P2), unconditional refusal, and
+        test (g): `461f5b1`. The (g) kernel runs use a 1 MeV energy cutoff
+        to stay short.
+  - [x] 6. Free gas, per-material temperature, `free_gas` switch (P3) and
+        free-gas tests: `218e29e`.
+        - A = 1 stationarity: p = 0.007, which passes. A diagnostic with
+          2e6 events on three other seeds gave p = 0.40, 0.70 and 0.17.
+        - A = 12 kernel shape: bin edges come from a 401-point CDF grid.
+          A first run with 4001 points also passed (p = 0.98 / 0.92, now
+          0.94 / 0.92).
+  - [x] 7. Hydrogen before/after: `f7668f5`. The cutoff fraction goes from
+        0.6941 to 0.0001.
+  - [x] 8. Regression (h), D7 reference recorded once: `35324bc`.
+  - [x] 9. Track recording and its test: `73ec321`. D7 stays byte-exact.
+  - [x] 10. Track scripts, GIF and PNG: `ab37270`.
+  - [x] 11. Docs: deviations, README, this status.
+  - No statistical check failed. Seeds and thresholds are as planned.
 - [ ] Later, after the user's history rewrite: provenance-only update of
       the regression manifests and of the hashes in this file.

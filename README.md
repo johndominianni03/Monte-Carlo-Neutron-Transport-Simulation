@@ -73,10 +73,42 @@ Phase 1 and Phase 2a kernels are unchanged.
   - counters for the neutron balance
 - **Synthetic nuclides** (`mcslab/synthetic.py`): constant cross sections,
   chosen mass, isotropic CM. Used for the analytic tests.
-- **Not yet (Part 2):** correlated and continuous-tabular laws,
-  energy-dependent yields, and free-gas thermal motion. The driver refuses
-  problems that can reach an unimplemented law. That means every real
-  Fe/W problem above ~1 keV and Be/F/Li at fusion energies.
+### Phase 2b, Part 2: every law in the data, free gas, tracks
+
+- **Every secondary law in the W / FLiBe / Fe data** (inventory:
+  `docs/law_inventory.md`, generated from the HDF5 files by
+  `scripts/law_inventory.py` with h5py only):
+  - correlated angle-energy (ACE law 61), in the CM frame (Fe, W) and in
+    the lab frame (Be-9 (n,2n), F-19)
+  - F-19 (n,2n)'s two-law applicability mixture
+  - continuous tabular (ACE law 4) with tabular angles (Li-6, Li-7
+    (n,2n)-type reactions)
+  - energy-dependent yields (MT 5 of Fe and W)
+
+  Each transcribes OpenMC v0.16.0's sampler, cited in the code. The driver
+  refuses any problem whose nuclides have a law that is not implemented.
+  None of the 14 files has one.
+- **Multiplicity** (approved deviation D2). A non-integer yield y gives
+  floor(y) or floor(y) + 1 neutrons, with mean y, and weights stay 1. A
+  multiplicity of 0 (e.g. Fe and W MT 5 below ~6 MeV) ends the neutron.
+  Its weight is tallied per region (`zero_yield_weight`) as its own term
+  of the exact balance.
+- **Free-gas target motion**, OpenMC's constant-cross-section model and
+  rule: the target is at rest only if E >= 400 kT and A > 1, so H-1 gets
+  free gas at every energy. kT is that of the data temperature.
+- **Temperature is a per-material input** (`CEMaterial.temperature`,
+  default 293.6 K). It selects the data temperature (250, 294, 600, 900,
+  1200 or 2500 K) by OpenMC's nearest rule, within 10 K.
+- **Track recording** (`KinRunConfig.n_track`) stores every event of
+  chosen histories (position, direction, energy, time, family particle
+  id, event type, MT). It draws no random number and touches no tally:
+  results are byte-identical with it on or off.
+- **Animation:** `scripts/record_tracks.py` saves tracks, and
+  `scripts/animate_tracks.py` turns them into `docs/figures/tracks.gif`
+  (depth vs log energy over time) and `docs/figures/tracks.png`.
+- **Regression reference** for the kinematic kernel, problem D7 (below).
+
+![Neutron tracks in W | FLiBe | Fe](docs/figures/tracks.gif)
 
 `docs/deviations_from_openmc.md` lists every known difference from OpenMC.
 
@@ -100,8 +132,13 @@ tests skip and the Phase 1 tests run as before.
 ./venv/bin/python -m pytest                                # all tests
 ./venv/bin/python tests/test_regression.py compare         # Phase 1 bit-identical regression
 ./venv/bin/python tests/test_regression_ce.py compare      # Phase 2a (CE) bit-identical regression
+./venv/bin/python tests/test_regression_kin.py compare     # Phase 2b kinematic bit-identical regression (D7)
 ./venv/bin/python scripts/make_inventory.py                # regenerate docs/data_inventory.md
+./venv/bin/python scripts/law_inventory.py                 # regenerate docs/law_inventory.md
 ./venv/bin/python scripts/plot_xs.py                       # regenerate docs/figures/*.png
+./venv/bin/python scripts/hydrogen_cutoff.py               # H-1 cutoff fraction, target at rest vs free gas
+./venv/bin/python scripts/record_tracks.py                 # D7 tracks -> outputs/tracks_d7.npz
+./venv/bin/python scripts/animate_tracks.py                # -> docs/figures/tracks.gif, tracks.png
 ```
 
 A kinematic run (Phase 2b), e.g. a synthetic scatterer:
@@ -118,7 +155,22 @@ cfg = KinRunConfig(SlabGeometry([0.0, 10.0], [S.SyntheticMaterial("x", (("X", 0.
                    BeamSource(), MonoEnergetic(2.0e6), S.SyntheticLibrary({"X": x}),
                    n_batches=20, histories_per_batch=1000, energy_cutoff=1.0e3)
 res = run_kin(cfg)
-print(res.balance())       # exact: source + created == absorbed + leaked + cutoff
+print(res.balance())       # exact: source + created == absorbed + leaked + cutoff + zero_yield
+```
+
+A real-data run with a material temperature and recorded tracks:
+
+```python
+import dataclasses
+from mcslab import ce_materials as cm
+from mcslab.nucdata import Library
+
+flibe = dataclasses.replace(cm.flibe(temperature_K=900.0), temperature=900.0)  # 900 K data
+cfg = KinRunConfig(SlabGeometry([0.0, 0.5, 20.5, 30.5], [cm.tungsten(), flibe, cm.iron()]),
+                   BeamSource(), MonoEnergetic(14.1e6), Library.open(),
+                   n_batches=20, histories_per_batch=5000, n_track=100)
+res = run_kin(cfg)
+res.tracks.save("tracks.npz")     # then: scripts/animate_tracks.py tracks.npz
 ```
 
 ## Tests: what they do and do not cover
@@ -184,9 +236,83 @@ print(res.balance())       # exact: source + created == absorbed + leaked + cuto
     `sources + created == absorbed + leaked + cutoff`, per batch, with
     every term cross-checked against an independent counter, and
     `created == (y-1) x events` per channel.
+    - **Its multiplication is not physical.** The synthetic (n,2n) and
+      (n,3n) laws give each identical copy the full two-body energy. A
+      14.1 MeV (n,2n) family on A = 9 therefore carries 2 x 9.76 =
+      19.5 MeV out of the 12.1 MeV available (E + Q). The secondaries
+      stay above threshold and multiply again, which gives 1.31
+      secondaries per source (beam) or 1.20 (isotropic source).
+    - That is fine for a bookkeeping test, but do not read it as a
+      physical number. The real D7 slab gives 0.26.
+  - **(a2)** also rebuilds its expected probabilities from the PDF alone,
+    never reading the stored CDF that the sampler uses. They must agree
+    to 1e-6 per bin (worst 2.8e-7).
 
-  Not covered yet: any law beyond tabular angle and level, thermal
-  physics, and any integral comparison on real data (Part 2).
+- `tests/test_laws.py` covers the Part 2 laws on real data. Seeds were
+  fixed in the plan before the tests existed.
+  - **Reader and packing.** All 301 non-redundant neutron reactions of
+    the 14 nuclides read and pack exactly as the independent h5py
+    inventory lists them. Edited copies of real files with unimplemented
+    or malformed laws are refused, and so is a whole problem containing
+    one, even below that reaction's threshold.
+  - **(f), replay.** All 56 reactions with a Part 2 law, at 3 incident
+    energies, 336000 events in all. Each event is replayed from its random
+    numbers on raw h5py arrays:
+    - E_out matches the replay to 2.6e-16 E_in.
+    - The forward CDF matches the draw: 2.5e-13 for E_out, 3.0e-10 for
+      mu.
+    - The CM->lab transform matches to 4.4e-16.
+    - The multiplicity is exact.
+  - **(f), statistical.** Joint (E_out, mu) chi-squares for Fe56 MT 91,
+    W184 MT 16, Be9 MT 16, F19 MT 16 and Li7 MT 16, each at an on-grid
+    and a between-grid incident energy (10 checks). The reference is
+    built from the PDFs alone; the stored CDF is never read.
+  - **(g), MT 5 multiplicity.** Fe56 and W184 at 6 energies: n is
+    floor(y) or ceil(y), and its mean equals y(E) at 3 SE. Integer yields
+    draw nothing extra.
+  - **(g), kernel.** On real W | Fe (30 MeV) and FLiBe (14.1 MeV) slabs,
+    created == (y - 1) x events per channel, and the balance with the
+    zero-yield term is exact per batch.
+- `tests/test_freegas.py` covers free gas and temperatures. The docstring
+  derives every expected value.
+  - **Stationarity.** E_in is drawn from the collision density
+    pi ~ sigma_eff(E) E exp(-E/kT). After one collision, E_out follows pi
+    again (chi-square), and its mean is kT (2 - 1/(2(A+1))), for A = 1
+    and 12.
+    - pi is not E exp(-E/kT). The flux pi / sigma_eff is Maxwellian only
+      if the tabulated cross section is sigma_eff.
+  - **Kernel shape** at fixed E_in = kT and 20 kT:
+    - A = 1 against the closed-form hydrogen (Wigner-Wilkins) kernel.
+    - A = 12 against a kernel integrated numerically over the Maxwellian
+      target, independently of the sampler.
+    - Above 400 kT (A = 12), the target-at-rest path is taken, bit for
+      bit.
+  - **Exact checks:**
+    - the dispatch rule
+    - the kernel's free-gas counter
+    - OpenMC's nearest-temperature selection
+    - per-material packing against h5py
+    - the Phase 2a driver refusing other temperatures
+- `tests/test_tracks.py`:
+  - Track recording on, off or truncated leaves every tally and count
+    byte-identical.
+  - Recorded tracks are consistent, to 1.1e-14 cm, and do not depend on
+    the batch split.
+  - The recorded events match the kernel's counters exactly.
+- `tests/test_regression_kin.py` **(h)** is a byte-exact regression of the
+  kinematic kernel on problem D7, with its own `tests/reference_kin/` and
+  pinned data sha256s.
+  - **Problem:** W 0.5 cm, then FLiBe 20 cm (900 K data and density),
+    then Fe 10 cm, with a 14.1 MeV beam, 20 x 5000 histories.
+  - **Per source:** 0.263 secondaries created, 0.322 absorbed, 0.562
+    leaked left, 0.375 leaked right, 0.0046 ended by zero yield, 0 cut
+    off.
+  - **What it is:** a bit-identity contract, not a validation of those
+    numbers.
+
+  Not covered yet: any comparison of real-data transport results with
+  OpenMC or with measurements (Phase 4), and any transport-level thermal
+  spectrum test.
 - `tests/test_reproducibility_kin.py`: the kinematic kernel is
   bit-identical under repeated, split and reordered batch runs with
   secondaries present. Bank overflow raises instead of dropping neutrons.
@@ -271,12 +397,23 @@ above.
   fetched or tested.
 
 ### Phase 2b, Part 1
-- **No thermal treatment yet: the target is always at rest.** Neutrons do
-  not thermalise; they keep slowing down until the energy cutoff
-  (1e-5 eV) kills them. In weakly absorbing media this is most of the
-  neutrons. Example: a 30 cm slab of pure H-1 at 0.0708 g/cm^3 (294 K
-  cross sections), 1 MeV beam, 10 batches x 1000 histories, seed 3, loses
-  69.41% of the source weight to the cutoff.
+- **(Fixed in Part 2.) No thermal treatment: the target was always at
+  rest.** Neutrons did not thermalise; they kept slowing down until the
+  energy cutoff (1e-5 eV) killed them. In weakly absorbing media this was
+  most of the neutrons.
+  - **Example:** a 30 cm slab of pure H-1 at 0.0708 g/cm^3 (294 K cross
+    sections), 1 MeV beam, 10 batches x 1000 histories, seed 3, lost
+    69.41% of the source weight to the cutoff.
+  - **With free gas** (`scripts/hydrogen_cutoff.py`, identical inputs),
+    the balance is exact in both runs:
+
+    | run | absorbed | leaked left | leaked right | cutoff (fraction) |
+    |---|---|---|---|---|
+    | target at rest (Part 1) | 1013 | 1421 | 625 | 6941 (0.6941) |
+    | free gas (Part 2) | 5748 | 3006 | 1245 | 1 (0.0001) |
+
+    The one remaining neutron is the sub-1e-5 eV tail of the thermal
+    population, which OpenMC would keep transporting.
   - **Cause.** With the target at rest, no collision can raise a
     neutron's energy. Hydrogen removes on average a factor e per
     collision, so a neutron at 1 eV reaches 1e-5 eV in about 11.5
@@ -292,20 +429,35 @@ above.
     broadening the cross section moves no energy. Only target motion in
     the kinematics does.
 
-  Results below about 1 eV are not physical until Part 2 adds free-gas
-  scattering. The lost weight is always reported, never hidden.
-- **Only elastic, discrete levels and absorption.** Correlated angle-energy
-  and continuous-tabular laws, and energy-dependent yields, arrive in
-  Part 2. Until then the driver refuses problems that can reach them,
-  which rules out real W, Fe, Be, F and Li problems at fusion energies.
+  Part 1 results below about 1 eV were not physical. The lost weight was
+  always reported, never hidden.
 - **Energy cutoff instead of extrapolating below the data grid.** This
   deviates from OpenMC, which has a zero cutoff and extrapolates.
-- **No regression reference for the kinematic kernel yet.** It arrives with
-  Part 2 (test h). Until then its behaviour is pinned by the statistical
-  and exact tests only.
 - **(n,2n)-type secondaries are identical copies** of the outgoing neutron
   (same energy and direction), as in OpenMC. Mean values are unaffected;
   the copies are fully correlated.
-- **Validated with synthetic data and single-collision real-data checks
-  only.** No transport result on real materials has been compared with
-  anything yet.
+
+### Phase 2b, Part 2
+- **Free gas only; no S(alpha,beta).** Target motion is OpenMC's
+  constant-cross-section free gas, with resonance scattering (DBRC/RVS)
+  off, as in OpenMC's defaults. None of these materials has thermal
+  scattering data in ENDF/B-VIII.0. Hydrogen is treated as a free gas of
+  protons, not as H2.
+- **Temperature.** Only OpenMC's default "nearest" rule: no interpolation
+  between data temperatures, no multipole, no on-the-fly broadening. A
+  material more than 10 K from 250, 294, 600, 900, 1200 or 2500 K is
+  refused. `flibe()`'s temperature argument still sets only its density.
+- **Validated by unit-level and synthetic checks only.**
+  - What is checked: every new law is checked per event and statistically
+    against the raw tables, free gas against analytic kernels, and the
+    real-data runs for exact balance.
+  - What is not: no real-data transport result has been compared with
+    OpenMC or experiment yet (Phase 4). The D7 reference pins the code's
+    behaviour; it does not show the numbers are right.
+- **Multiplicity variance differs from OpenMC** (D2): analog integer
+  sampling, not weight x yield. Means agree.
+- **No event limit per particle** (OpenMC stops at 1e6 events). A neutron
+  in a large non-absorbing medium could scatter for a very long time.
+- **Photons are ignored**, including photon products of every reaction.
+  So are the charged particles and recoils of (n,n'alpha)t and the like:
+  tritium and gas production are not tallied yet (Phase 3).
