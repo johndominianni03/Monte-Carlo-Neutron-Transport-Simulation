@@ -37,15 +37,28 @@ src/distribution_angle.cpp, src/distribution_energy.cpp):
     product_0/yield                 Polynomial (coefficients) or Tabulated1D
     product_0/distribution_<j>      attr type
         applicability               Tabulated1D, read only when n_distribution > 1
+      type "uncorrelated":
         angle/energy                incident energies (non-decreasing)
         angle/mu                    rows x, p, c; attrs offsets, interpolation
-        energy                      attr type; "level" has threshold, mass_ratio
+        energy                      attr type; "level" has threshold, mass_ratio;
+                                    "continuous" (ACE law 4) has datasets
+                                    energy (incident; attr interpolation) and
+                                    distribution (rows E_out, p, c; attrs
+                                    offsets, interpolation, n_discrete_lines)
+      type "correlated" (ACE law 61, src/secondary_correlated.cpp):
+        energy                      incident energies; attr interpolation
+        energy_out                  rows E_out, p, c, mu interpolation, mu
+                                    offset; attrs offsets, interpolation,
+                                    n_discrete_lines
+        mu                          rows x, p, c of the angle tables
 
-Only what mcslab implements is parsed. A law it does not implement (yet)
-is kept as UnsupportedLaw, and the kinematic driver refuses a problem in
-which such a reaction can occur. Anything unexpected inside a law it does
+Only what mcslab implements is parsed. A law it does not implement is kept
+as UnsupportedLaw: other distribution or energy types, discrete lines,
+histogram incident-energy interpolation. The kinematic driver refuses any
+problem whose nuclides have one. Anything unexpected inside a law it does
 parse (an unknown attribute or key, an interpolation code other than
-histogram or lin-lin, a malformed table) raises instead of being guessed.
+histogram or lin-lin, more than one interpolation region, a malformed
+table) raises instead of being guessed.
 """
 from __future__ import annotations
 
@@ -140,9 +153,32 @@ class LevelInelastic:
 
 
 @dataclass(frozen=True)
+class ContinuousTabular:
+    """Outgoing-energy tables at incident energies (OpenMC
+    ContinuousTabular, ACE law 4). Each table is a Tabular on E_out, kept as
+    stored: OpenMC samples these with the stored CDF and does not normalise
+    it (src/distribution_energy.cpp). Incident interpolation is one lin-lin
+    region (anything else is refused or kept as UnsupportedLaw)."""
+    energy: np.ndarray = field(repr=False)
+    tables: Tuple[Tabular, ...] = field(repr=False)
+
+
+@dataclass(frozen=True)
+class CorrelatedAngleEnergy:
+    """Correlated energy-angle tables (OpenMC CorrelatedAngleEnergy, ACE law
+    61). tables[i] is the E_out table at incident energy i (stored CDF, not
+    normalised, as in OpenMC); mu[i][k] is the angle table for outgoing
+    point k of that table (a Tabular, normalised at packing like OpenMC's
+    Tabular::init)."""
+    energy: np.ndarray = field(repr=False)
+    tables: Tuple[Tabular, ...] = field(repr=False)
+    mu: Tuple[Tuple[Tabular, ...], ...] = field(repr=False)
+
+
+@dataclass(frozen=True)
 class UncorrelatedAngleEnergy:
     angle: Optional[AngleDistribution]   # None: isotropic
-    energy: Optional[LevelInelastic]     # None: no energy law (elastic)
+    energy: Optional[object]             # None (elastic), LevelInelastic or ContinuousTabular
 
 
 @dataclass(frozen=True)
@@ -313,8 +349,130 @@ def _read_angle(group) -> AngleDistribution:
     return AngleDistribution(energy, tuple(tables))
 
 
+def _check_eout_table(obj, x, p, c, interp):
+    """An outgoing-energy table. Unlike angle tables, E_out may repeat a
+    point, but only where the CDF does not increase (the W law-61 tables
+    end with a zero-width, zero-mass pair, which the sampler can never
+    select because c reaches 1 before it)."""
+    if interp not in _LAW_INTERPOLATIONS:
+        _refuse(obj, f"interpolation code {interp} (only histogram/lin-lin)")
+    if x.size < 2 or not (np.isfinite(x).all() and np.isfinite(p).all()
+                          and np.isfinite(c).all()):
+        _refuse(obj, "table with < 2 points or non-finite values")
+    dx = np.diff(x)
+    if x[0] < 0.0 or (dx < 0.0).any() or ((dx == 0.0) & (np.diff(c) != 0.0)).any():
+        _refuse(obj, "E_out decreasing, negative, or repeated with probability mass")
+    if (p < 0.0).any() or (np.diff(c) < 0.0).any() or not c[-1] > 0.0:
+        _refuse(obj, "negative PDF, decreasing CDF, or CDF ending at 0")
+
+
+def _incident_energies(ds, what):
+    """Incident energies of a law-4 / law-61 table set, or an UnsupportedLaw
+    if the incident interpolation is not one lin-lin region. OpenMC's
+    correlated sampler ignores this interpolation (it always interpolates
+    stochastically, lin-lin), so mcslab accepts only lin-lin rather than
+    guess."""
+    _check_attrs(ds, ("interpolation",))
+    interp = np.asarray(ds.attrs["interpolation"])
+    energy = np.array(ds[()], dtype=np.float64)
+    if interp.ndim != 2 or interp.shape[0] != 2:
+        _refuse(ds, f"interpolation attribute of shape {interp.shape}, expected (2, n)")
+    if interp.shape[1] != 1 or int(interp[0, 0]) != energy.size:
+        _refuse(ds, f"{interp.shape[1]} incident interpolation regions (only 1 supported)")
+    code = int(interp[1, 0])
+    if code not in _LAW_INTERPOLATIONS:
+        _refuse(ds, f"incident interpolation code {code} (only histogram/lin-lin)")
+    if energy.size < 2 or not np.isfinite(energy).all() or (np.diff(energy) <= 0.0).any():
+        _refuse(ds, "incident energies: fewer than 2, non-finite or not strictly increasing")
+    if code != LIN_LIN:
+        return None, UnsupportedLaw(f"{what} with histogram incident-energy interpolation")
+    return energy, None
+
+
+def _eout_tables(ds, n_energy, rows):
+    """Split a law-4 / law-61 outgoing-energy dataset into per-incident
+    tables. -> (tables, [(start, stop)], UnsupportedLaw or None)."""
+    _check_attrs(ds, ("offsets", "interpolation", "n_discrete_lines"))
+    data = np.array(ds[()], dtype=np.float64)
+    offsets = np.asarray(ds.attrs["offsets"], dtype=np.int64)
+    interps = np.asarray(ds.attrs["interpolation"], dtype=np.int64)
+    n_disc = np.asarray(ds.attrs["n_discrete_lines"], dtype=np.int64)
+    if data.ndim != 2 or data.shape[0] != rows or offsets.size != n_energy \
+            or interps.size != n_energy or n_disc.size != n_energy:
+        _refuse(ds, "outgoing-energy layout does not match the incident energies")
+    if offsets[0] != 0 or (np.diff(offsets) <= 0).any() or offsets[-1] >= data.shape[1]:
+        _refuse(ds, "outgoing-energy offsets not increasing from 0")
+    if (n_disc != 0).any():
+        return None, None, UnsupportedLaw("outgoing-energy table with discrete lines")
+    ends = np.append(offsets[1:], data.shape[1])
+    tables, spans = [], []
+    for j0, j1, it in zip(offsets, ends, interps):
+        x, p, c = data[0, j0:j1], data[1, j0:j1], data[2, j0:j1]
+        _check_eout_table(ds, x, p, c, int(it))
+        tables.append(Tabular(x, p, c, int(it)))
+        spans.append((int(j0), int(j1)))
+    return tables, spans, None
+
+
+def _read_continuous(eg):
+    """uncorrelated energy law "continuous" (OpenMC ContinuousTabular)."""
+    _check_attrs(eg, ("type",))
+    if set(eg) != {"energy", "distribution"}:
+        _refuse(eg, f"unexpected contents {sorted(eg)}")
+    energy, unsupported = _incident_energies(eg["energy"], "continuous tabular")
+    if unsupported is not None:
+        return unsupported
+    tables, _, unsupported = _eout_tables(eg["distribution"], energy.size, 3)
+    if unsupported is not None:
+        return unsupported
+    return ContinuousTabular(energy, tuple(tables))
+
+
+def _read_correlated(group):
+    """distribution type "correlated" (OpenMC CorrelatedAngleEnergy)."""
+    _check_attrs(group, ("type",))
+    if not {"energy", "energy_out", "mu"} <= set(group) or \
+            set(group) - {"energy", "energy_out", "mu", "applicability"}:
+        _refuse(group, f"unexpected contents {sorted(group)}")
+    energy, unsupported = _incident_energies(group["energy"], "correlated")
+    if unsupported is not None:
+        return unsupported
+    eo = group["energy_out"]
+    tables, spans, unsupported = _eout_tables(eo, energy.size, 5)
+    if unsupported is not None:
+        return unsupported
+    data = np.array(eo[()], dtype=np.float64)
+    mds = group["mu"]
+    if mds.attrs.keys():
+        _refuse(mds, "unexpected attributes")
+    mu = np.array(mds[()], dtype=np.float64)
+    if mu.ndim != 2 or mu.shape[0] != 3:
+        _refuse(mds, f"shape {mu.shape}, expected (3, n)")
+    # rows 3 and 4: angle-table interpolation code and offset, one per
+    # outgoing point, stored as floats (OpenMC rounds them with lround)
+    codes, moff = data[3], data[4]
+    if (codes != np.round(codes)).any() or (moff != np.round(moff)).any():
+        _refuse(eo, "angle-table codes or offsets are not integers")
+    codes = np.round(codes).astype(np.int64)
+    moff = np.round(moff).astype(np.int64)
+    if moff[0] != 0 or (np.diff(moff) <= 0).any() or moff[-1] >= mu.shape[1]:
+        _refuse(eo, "angle-table offsets not increasing from 0")
+    mend = np.append(moff[1:], mu.shape[1])
+    angle_tables = []
+    for j0, j1 in spans:
+        row = []
+        for k in range(j0, j1):
+            x, p, c = mu[0, moff[k]:mend[k]], mu[1, moff[k]:mend[k]], mu[2, moff[k]:mend[k]]
+            _check_table(mds, x, p, c, int(codes[k]), -1.0, 1.0)
+            row.append(Tabular(x, p, c, int(codes[k])))
+        angle_tables.append(tuple(row))
+    return CorrelatedAngleEnergy(energy, tuple(tables), tuple(angle_tables))
+
+
 def _read_law(group):
     kind = _str(group.attrs["type"])
+    if kind == "correlated":
+        return _read_correlated(group)
     if kind != "uncorrelated":
         return UnsupportedLaw(kind)
     _check_attrs(group, ("type",))
@@ -326,12 +484,17 @@ def _read_law(group):
     if "energy" in group:
         eg = group["energy"]
         etype = _str(eg.attrs["type"])
-        if etype != "level":
+        if etype == "continuous":
+            energy = _read_continuous(eg)
+            if isinstance(energy, UnsupportedLaw):
+                return energy
+        elif etype == "level":
+            _check_attrs(eg, ("type", "threshold", "mass_ratio"))
+            if isinstance(eg, h5py.Group) and len(eg):
+                _refuse(eg, "level law with sub-datasets")
+            energy = LevelInelastic(float(eg.attrs["threshold"]), float(eg.attrs["mass_ratio"]))
+        else:
             return UnsupportedLaw(f"uncorrelated(energy={etype})")
-        _check_attrs(eg, ("type", "threshold", "mass_ratio"))
-        if isinstance(eg, h5py.Group) and len(eg):
-            _refuse(eg, "level law with sub-datasets")
-        energy = LevelInelastic(float(eg.attrs["threshold"]), float(eg.attrs["mass_ratio"]))
     return UncorrelatedAngleEnergy(angle, energy)
 
 

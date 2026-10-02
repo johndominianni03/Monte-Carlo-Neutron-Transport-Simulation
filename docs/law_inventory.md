@@ -47,6 +47,7 @@ A reaction with two distributions (F19 MT 16) is listed once per distribution.
 - Distribution kinds present: angle-only, continuous, correlated, level. No Kalbach-Mann, N-body, evaporation, Maxwell or Watt law occurs.
 - Product 0 is the neutron in every reaction: True. Reactions with more than one neutron product: 0.
 - Law 4 / law 61 tables: incident interpolation [(1, 2)] (regions, code); discrete lines [0]; smallest table 2 points; first E_out [0.0] eV; (c first, c last) [(0.0, 1.0)]; largest last p 0.
+- Outgoing energies are non-decreasing, but 1275 tables repeat a point: positions ['last'], CDF increment at the repeat [0.0], in W180 MT 5, 16-17, 28, 37, 41, 91; W182 MT 5, 16-17, 28, 37, 41, 91; W183 MT 5, 16-17, 28, 37, 41, 91; W184 MT 5, 16-17, 28, 37, 41, 91; W186 MT 5, 16-17, 28, 37, 41, 91; Li6 MT 24. Each is a zero-width, zero-mass final pair after c has reached 1, so no sampled CDF value (< 1) can select it.
 - Incident energies strictly increasing in every law 4 / law 61 table: True.
 - Reactions whose cross section is positive below their law's first incident energy (would need extrapolation): 0.
 - Stored CDF c vs the integral of the PDF p alone, max |c/c_last - C/C_last|: E_out tables 1.14e-07; correlated mu tables 9.19e-07; tabular angle distributions 9.06e-07.

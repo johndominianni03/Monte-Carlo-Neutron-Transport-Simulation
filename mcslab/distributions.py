@@ -109,6 +109,8 @@ class Unsupported(Exception):
 def pack_law(pools: Pools, law) -> int:
     if not isinstance(law, nucdata.UncorrelatedAngleEnergy):
         raise Unsupported(getattr(law, "description", type(law).__name__))
+    if law.energy is not None and not isinstance(law.energy, nucdata.LevelInelastic):
+        raise Unsupported(f"uncorrelated energy law {type(law.energy).__name__}")
     angle = -1 if law.angle is None else pack_angle(pools, law.angle)
     ekind = E_NONE if law.energy is None else E_LEVEL
     return pools.put_ints([LAW_UNCORRELATED, angle, ekind, -1])

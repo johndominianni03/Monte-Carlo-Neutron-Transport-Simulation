@@ -67,6 +67,16 @@ def _cdf_mismatch(x, p, c, interp):
     return float(np.max(np.abs(c / c[-1] - C / C[-1])))
 
 
+def _repeats(tabs):
+    """[(position, cdf increment)] for every repeated E_out point: position
+    'last' if it is the final pair of its table, else 'interior'."""
+    out = []
+    for x, _, c in tabs:
+        for i in np.flatnonzero(np.diff(x) == 0.0):
+            out.append(("last" if i == x.size - 2 else "interior", float(c[i + 1] - c[i])))
+    return out
+
+
 def _angle(group):
     mu = group["mu"]
     data, spans = _tables(mu, group["energy"].shape[0])
@@ -89,6 +99,7 @@ def _continuous(group):
             "n_discrete": _codes(dist.attrs["n_discrete_lines"]),
             "cdf_mismatch": max(_cdf_mismatch(x, p, c, it) for (x, p, c), it in zip(tabs, ints)),
             "min_points": min(x.size for x, _, _ in tabs),
+            "repeats": _repeats(tabs),
             "first_e_out": sorted({float(x[0]) for x, _, _ in tabs}),
             "c_ends": sorted({(float(c[0]), float(c[-1])) for _, _, c in tabs}),
             "last_p": max(float(p[-1]) for _, p, _ in tabs),
@@ -114,6 +125,7 @@ def _correlated(group):
             "cdf_mismatch": max(_cdf_mismatch(x, p, c, it) for (x, p, c), it in zip(tabs, ints)),
             "cdf_mismatch_mu": worst_mu,
             "min_points": min(x.size for x, _, _ in tabs),
+            "repeats": _repeats(tabs),
             "first_e_out": sorted({float(x[0]) for x, _, _ in tabs}),
             "c_ends": sorted({(float(c[0]), float(c[-1])) for _, _, c in tabs}),
             "last_p": max(float(p[-1]) for _, p, _ in tabs),
@@ -326,6 +338,17 @@ def main():
       f"{sorted({v for d in law_rows for v in d['first_e_out']})} eV; (c first, c last) "
       f"{sorted({v for d in law_rows for v in d['c_ends']})}; largest last p "
       f"{max(d['last_p'] for d in law_rows):g}.")
+    reps = [(r["nuclide"], r["mt"], pos, dc) for r in rows for d in r["distributions"]
+            if d["kind"] in ("correlated", "continuous") for pos, dc in d["repeats"]]
+    rep_where = OrderedDict()
+    for n, m, _, _ in reps:
+        rep_where.setdefault(n, set()).add(m)
+    w(f"- Outgoing energies are non-decreasing, but {len(reps)} tables repeat a point: "
+      f"positions {sorted({p for _, _, p, _ in reps})}, CDF increment at the repeat "
+      f"{sorted({dc for _, _, _, dc in reps})}, in "
+      + "; ".join(f"{n} MT {_mts(sorted(m))}" for n, m in rep_where.items())
+      + ". Each is a zero-width, zero-mass final pair after c has reached 1, so no "
+      "sampled CDF value (< 1) can select it.")
     w(f"- Incident energies strictly increasing in every law 4 / law 61 table: "
       f"{all(bool(np.all(np.diff(d['incident_energies']) > 0)) for d in law_rows)}.")
     w(f"- Reactions whose cross section is positive below their law's first incident energy "
