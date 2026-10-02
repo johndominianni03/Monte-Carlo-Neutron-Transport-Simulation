@@ -52,7 +52,11 @@ What each test covers, and what it doesn't:
        inverse-CDF map, not through the packer. It covers table search,
        stochastic interpolation between incident energies, lin-lin and
        histogram tables, and the repeated-energy rule. It does not test the
-       data themselves.
+       data themselves. Because that map uses the stored CDF column c (as the
+       sampler does), the expected probabilities are also rebuilt from the
+       PDF p alone (exact integration, c never read) and must agree to 1e-6
+       per bin (approved P4, Part 2): a misreading of c shared by sampler and
+       test would show up there.
 """
 import math
 import os
@@ -225,6 +229,36 @@ def mixture_cdf(energy, tables, E):
     return lambda X: (1.0 - r) * table_cdf(tables[i], X) + r * table_cdf(tables[i + 1], X)
 
 
+def table_cdf_p_only(table, X):
+    """P(mu <= X) from the PDF p alone: exact integral of the
+    piecewise-constant or piecewise-linear p up to X, divided by its own
+    total. The stored c is never read."""
+    x, p, _, interp = table
+    total = 0.0
+    below = 0.0
+    for i in range(x.size - 1):
+        dx = x[i + 1] - x[i]
+        m = 0.0 if interp == 1 else (p[i + 1] - p[i]) / dx
+        full = p[i] * dx + 0.5 * m * dx * dx
+        total += full
+        d = min(max(X - x[i], 0.0), dx)
+        below += p[i] * d + 0.5 * m * d * d
+    return below / total
+
+
+def mixture_cdf_p_only(energy, tables, E):
+    """mixture_cdf with table_cdf_p_only (same incident-table rule)."""
+    i, r = 0, 0.0
+    if E >= energy[0]:
+        i = 0 if energy[0] == E else int(np.searchsorted(energy, E, side="left")) - 1
+        if i + 1 < energy.size:
+            r = (E - energy[i]) / (energy[i + 1] - energy[i])
+    if r == 0.0:
+        return lambda X: table_cdf_p_only(tables[i], X)
+    return lambda X: ((1.0 - r) * table_cdf_p_only(tables[i], X)
+                      + r * table_cdf_p_only(tables[i + 1], X))
+
+
 @njit(cache=True)
 def _sample_angles(ip, fp, a, E, seed, n):
     """n cosines from one AngleDistribution record, sample s on the stream of
@@ -298,6 +332,12 @@ def test_a2_tabular_angle_sampler(report, note, nuclide, mt, where):
     k, n = 40, 200_000
     edges = equiprobable_edges(cdf, -1.0, 1.0, k)
     probs = np.diff([cdf(e) for e in edges])
+    # P4: the same bins from p alone (independent of the stored c)
+    cdf_p = mixture_cdf_p_only(energy, tables, E)
+    dev = float(np.max(np.abs(probs - np.diff([cdf_p(e) for e in edges]))))
+    note(f"(a2) {nuclide} MT {mt} at {E:.6g} eV: max |bin probability (stored-CDF map) - "
+         f"(p only)| = {dev:.1e} (bound 1e-6)")
+    assert dev <= 1e-6
     ip, fp, a = _packed(ang)
     mu = _sample_angles(ip, fp, a, E, np.uint64(SEED_A2), n)
     assert np.all(np.abs(mu) <= 1.0)

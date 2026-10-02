@@ -42,6 +42,7 @@ import numpy as np
 from numba import njit
 
 from . import distributions as D
+from . import nucdata as N
 from .rng import prn
 from .xs import interp_at
 
@@ -87,6 +88,37 @@ def _first_positive_energy(grid, rx) -> float:
     return float(grid[max(j - 1, 0)])
 
 
+def _is_level(law) -> bool:
+    return (isinstance(law, N.UncorrelatedAngleEnergy)
+            and isinstance(law.energy, N.LevelInelastic))
+
+
+def _check_laws(name, mt, product):
+    """Elastic must be a single uncorrelated law without an energy law and
+    with yield 1 (OpenMC elastic_scatter reads only its angle). Every other
+    channel needs an energy distribution."""
+    for law in product.laws:
+        has_energy = (isinstance(law, N.CorrelatedAngleEnergy)
+                      or (isinstance(law, N.UncorrelatedAngleEnergy) and law.energy is not None))
+        if mt == ELASTIC_MT and (has_energy or len(product.laws) != 1
+                                 or product.yield_coefficients != (1.0,)):
+            raise ValueError(f"{name} MT 2: elastic must be one angle-only law with yield 1")
+        if mt != ELASTIC_MT and not has_energy:
+            raise D.Unsupported("non-elastic law without an energy distribution")
+
+
+def _kernel_ready(product) -> bool:
+    """Laws the transport kernel handles at this commit: Part 1's (one
+    uncorrelated law, isotropic or tabular angle, no energy law or a level
+    law, constant positive integer yield). The samplers handle every
+    packed law; the kernel learns zero-yield events in the next commit."""
+    y = product.yield_coefficients
+    return (product.yield_table is None and len(y) == 1 and y[0] >= 1.0
+            and math.floor(y[0]) == y[0] and len(product.laws) == 1
+            and isinstance(product.laws[0], N.UncorrelatedAngleEnergy)
+            and (product.laws[0].energy is None or _is_level(product.laws[0])))
+
+
 def pack_physics(names: Sequence[str], nuclides: dict) -> PackedPhysics:
     """Scatter channels and their laws for the nuclides `names` (in xs.pack
     order). Laws mcslab cannot sample are recorded in `unsupported`."""
@@ -112,15 +144,14 @@ def pack_physics(names: Sequence[str], nuclides: dict) -> PackedPhysics:
             c = len(rows)
             try:
                 prod = D.pack_product(pools, products[0])
-                has_energy_law = products[0].laws[0].energy is not None
-                if mt == ELASTIC_MT and has_energy_law:
-                    raise ValueError(f"{name} MT 2: elastic law has an energy distribution")
-                if mt != ELASTIC_MT and not has_energy_law:
-                    raise D.Unsupported("non-elastic law without an energy distribution")
+                _check_laws(name, mt, products[0])
             except D.Unsupported as exc:
                 prod = -1
                 unsupported.append((c, f"{name} MT {mt}: {exc}"))
-            if prod >= 0 and mt != ELASTIC_MT:
+            if prod >= 0 and not _kernel_ready(products[0]):
+                unsupported.append((c, f"{name} MT {mt}: law packed but not yet wired "
+                                       "into the transport kernel"))
+            if prod >= 0 and any(_is_level(law) for law in products[0].laws):
                 # level law: E_cm >= 0 needs E >= -Q (A+1)/A wherever xs > 0
                 thr = -rx.q_value * (nuc.awr + 1.0) / nuc.awr
                 if _first_positive_energy(nuc.energy, rx) < thr:
@@ -273,16 +304,34 @@ def cm_to_lab(E_in, E_cm, mu_cm, awr):
 
 
 @njit(cache=True)
+def multiplicity(y, rng):
+    """Number of outgoing neutrons for yield y (approved deviation D2).
+    OpenMC (physics.cpp inelastic_scatter) creates y - 1 copies for an
+    integer y > 0 and otherwise multiplies the weight by y. mcslab keeps
+    weights at 1: an integer y (including 0) gives exactly y neutrons with
+    no draw; otherwise one draw xi gives floor(y) + [xi < y - floor(y)],
+    whose mean is exactly y."""
+    fl = math.floor(y)
+    if fl == y:
+        return int(fl)
+    if prn(rng) < y - fl:
+        return int(fl) + 1
+    return int(fl)
+
+
+@njit(cache=True)
 def inelastic_scatter(E_in, u, v, w, awr, q, cm, ip, fp, prod, rng):
     """OpenMC physics.cpp inelastic_scatter. Returns
-    (E', u', v', w', mu_lab, neutrons out). The yield is a positive integer
-    y (packing refuses anything else in Part 1); the caller banks y - 1
-    identical copies, as OpenMC does."""
+    (E', u', v', w', mu_lab, neutrons out). The law is sampled, transformed
+    from CM to lab if needed and the direction rotated (OpenMC's order);
+    then the yield at E_in gives the number of outgoing neutrons
+    (multiplicity, D2). The caller banks n - 1 identical copies for n >= 2,
+    as OpenMC does, and ends the neutron for n = 0."""
     E, mu = D.sample_product(ip, fp, prod, E_in, awr, q, rng)
     if cm:
         E, mu = cm_to_lab(E_in, E, mu, awr)
     if abs(mu) > 1.0:
         mu = math.copysign(1.0, mu)
     u, v, w = rotate_angle(u, v, w, mu, rng)
-    n_out = int(round(D.product_yield(ip, fp, prod)))
+    n_out = multiplicity(D.product_yield(ip, fp, prod, E_in), rng)
     return E, u, v, w, mu, n_out
