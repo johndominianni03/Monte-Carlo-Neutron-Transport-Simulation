@@ -1,0 +1,227 @@
+{
+  "reason": "Initial Phase 2b kinematic reference (test h, problem D7): W 0.5 / FLiBe 20 / Fe 10 cm, 14.1 MeV beam, 20 x 5000, seed 20261023; first record, after all Part 2 physics landed (ACE law 61 / law 4 / applicability / tabulated-yield samplers, zero-yield tally, OpenMC cxs free gas, per-material temperature with FLiBe on 900 K data)",
+  "recorded_utc": "2026-10-02T00:33:17+00:00",
+  "git_commit": "f7668f5b3f4a37eb42fe0b4cb8bcd1564ba281ce",
+  "git_dirty": false,
+  "environment": {
+    "python": "3.9.6",
+    "numpy": "2.0.2",
+    "numba": "0.60.0",
+    "llvmlite": "0.43.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64"
+  },
+  "library": "ENDF/B-VIII.0",
+  "data_files": {
+    "neutron/Be9.h5": "2ccad4289825e558489fd0c7ddf7c796e2c2e0785ace6589c7ba5c3351eda9b0",
+    "neutron/F19.h5": "07f3ed44a951e453058e65e79a688ce96f4a20b189d3827c0b618a96e3b5a0ac",
+    "neutron/Fe54.h5": "9342a61e06c94428ff860e9d3e35179575897da9036cbbbb9312f4224b879b65",
+    "neutron/Fe56.h5": "afda738f1ce679b7c528ecf12414c5a3dc3b34dd1e9f5db7f4573c89f3a40fd4",
+    "neutron/Fe57.h5": "db2c4825ba74f476c1a839e4c5df283f61fc56a8cf28ad157307111c02a90ddd",
+    "neutron/Fe58.h5": "c71d1d63304b50f5cf1400afc9eda5185596645d6e9d6d730f89da5a3f2419dd",
+    "neutron/Li6.h5": "8399d640c224ed4d348a688e85017e5545040df1e38dbf45ab31d28c8827218b",
+    "neutron/Li7.h5": "a2a5a7a5901628c711d6e4085429bd46855bd8239f1ec9889b007f25d0e0f015",
+    "neutron/W180.h5": "7de5126bb2090cd95add7f37e38997d02657600bf66738bb7e601d34ec44bf27",
+    "neutron/W182.h5": "edbbdbd4166ae03411f00ade36d7c8b0837da6ffd9c6ad144cb18bedfdb770c1",
+    "neutron/W183.h5": "10973e7cbbc34362172b34f1b171b44f06622d2e6f0819d5599802e43007d686",
+    "neutron/W184.h5": "d845cab7f30dd7ba81d48edfe8353534b4cb2ddde5b5cec1c027a650e3c8b240",
+    "neutron/W186.h5": "41cbd1b9a9e4d887013807890ed720dbb66a086570b90cc6c12cf64ff8f48070"
+  },
+  "problems": {
+    "kin_d7": {
+      "bounds_cm": [
+        0.0,
+        0.5,
+        20.5,
+        30.5
+      ],
+      "materials": [
+        {
+          "name": "W",
+          "density_g_cm3": 19.3,
+          "temperature_K": 293.6,
+          "data_temperature": {
+            "W180": "294K",
+            "W182": "294K",
+            "W183": "294K",
+            "W184": "294K",
+            "W186": "294K"
+          },
+          "atoms_per_barn_cm": {
+            "W180": 7.586561028438191e-05,
+            "W182": 0.016753655604467673,
+            "W183": 0.009046974026412543,
+            "W184": 0.01937101915927885,
+            "W186": 0.01797382750320815
+          }
+        },
+        {
+          "name": "FLiBe",
+          "density_g_cm3": 1.9734399999999996,
+          "temperature_K": 900.0,
+          "data_temperature": {
+            "Li6": "900K",
+            "Li7": "900K",
+            "Be9": "900K",
+            "F19": "900K"
+          },
+          "atoms_per_barn_cm": {
+            "Li6": 0.0018243867247999916,
+            "Li7": 0.022212329016965383,
+            "Be9": 0.012018357870882686,
+            "F19": 0.04807343148353074
+          }
+        },
+        {
+          "name": "Fe",
+          "density_g_cm3": 7.874,
+          "temperature_K": 293.6,
+          "data_temperature": {
+            "Fe54": "294K",
+            "Fe56": "294K",
+            "Fe57": "294K",
+            "Fe58": "294K"
+          },
+          "atoms_per_barn_cm": {
+            "Fe54": 0.004963012842736643,
+            "Fe56": 0.07790868783104497,
+            "Fe57": 0.0017992513624908375,
+            "Fe58": 0.00023944732620217847
+          }
+        }
+      ],
+      "source": "BeamSource()",
+      "spectrum": "MonoEnergetic(energy_eV=14100000.0)",
+      "library": "ENDF/B-VIII.0",
+      "n_batches": 20,
+      "histories_per_batch": 5000,
+      "seed": 20261023,
+      "energy_cutoff": null,
+      "energy_edges": [
+        9.999999999999997e-06,
+        2.0301388858986285e-05,
+        4.121463896037725e-05,
+        8.36714412217345e-05,
+        0.00016986464646342471,
+        0.00034484882412482153,
+        0.0007000910076122174,
+        0.0014212819782215157,
+        0.002885399811814427,
+        0.005857762359329054,
+        0.011892071150027212,
+        0.02414255607554347,
+        0.049012741893949,
+        0.09950267322341867,
+        0.20200424616172652,
+        0.41009667524955984,
+        0.8325532074018733,
+        1.6901986409261691,
+        3.4313379858372297,
+        6.966092675709239,
+        14.142135623730955,
+        28.710499459388473,
+        58.2863013860761,
+        118.32928695908025,
+        240.22488679628634,
+        487.689884045737,
+        990.0781978606441,
+        2009.9962495573302,
+        4080.571546736741,
+        8284.126973721772,
+        16817.9283050743,
+        34142.73023238655,
+        69314.48431551468,
+        140718.02996493696,
+        285677.144578867,
+        579964.2800220426,
+        1177408.03730495,
+        2390301.8411023626,
+        4852644.716656992,
+        9851542.738735875,
+        19999999.999999978
+      ],
+      "free_gas": true,
+      "free_gas_threshold": 400.0,
+      "temperature_tolerance": 10.0
+    }
+  },
+  "arrays": {
+    "kin_d7__chan_created": {
+      "shape": [
+        20,
+        300
+      ],
+      "dtype": "int64",
+      "sha256": "678b8312c106d0c4921ddcfaffb0bfdfd3ede52e03bfcc53734cce5d8a981cb0"
+    },
+    "kin_d7__chan_events": {
+      "shape": [
+        20,
+        300
+      ],
+      "dtype": "int64",
+      "sha256": "590b07f58fb0901b4a83e9572ff6c29d9d6594d0850a2e46feebda18add0cf0e"
+    },
+    "kin_d7__chan_zero": {
+      "shape": [
+        20,
+        300
+      ],
+      "dtype": "int64",
+      "sha256": "43647a08d62707bb130512fa71a490506fd4d19360e9efc792a680852ae158a3"
+    },
+    "kin_d7__cutoff_weight": {
+      "shape": [
+        20,
+        3
+      ],
+      "dtype": "float64",
+      "sha256": "4b48f21a4b7a02bfbec19ef880a967a02334a3cdcef8ae83de2ef327ba8bc5dd"
+    },
+    "kin_d7__diagnostics": {
+      "shape": [
+        20,
+        15
+      ],
+      "dtype": "int64",
+      "sha256": "81e2f781bab56ed4eefc770ae890098ded4792cfef832663d520e4afa1837f50"
+    },
+    "kin_d7__region_sums": {
+      "shape": [
+        20,
+        4,
+        3
+      ],
+      "dtype": "float64",
+      "sha256": "4042a255e8270d9405bbecbfa32286da10f7f8ae9663149df862e9c46ec631ce"
+    },
+    "kin_d7__spectrum": {
+      "shape": [
+        20,
+        2,
+        3,
+        40
+      ],
+      "dtype": "float64",
+      "sha256": "fb011ebf4e54db79706624e2dce26b4d2ed0c8b590307a58dae474cfbaac7c69"
+    },
+    "kin_d7__surface_sums": {
+      "shape": [
+        20,
+        2,
+        4
+      ],
+      "dtype": "float64",
+      "sha256": "321dd851514e30205e6420485cbcdc72c6ec0332d2c6ed7e70ee90ceb3419439"
+    },
+    "kin_d7__zero_yield_weight": {
+      "shape": [
+        20,
+        3
+      ],
+      "dtype": "float64",
+      "sha256": "5e62a3c884e5c6f57b19302f497fd94ef31e34e0c7664f022e006e81394adbca"
+    }
+  },
+  "history": []
+}
