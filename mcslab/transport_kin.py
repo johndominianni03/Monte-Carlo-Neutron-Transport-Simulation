@@ -44,8 +44,17 @@ covariant, so this choice of azimuth changes no tally.
 
 Time: t += d / speed(E), with OpenMC's relativistic speed
 c sqrt(E (E + 2m)) / (E + m) (particle.cpp Particle::speed; constants.h,
-CODATA 2018). It is carried for track recording (Part 2) and scores
-nothing.
+CODATA 2018). It is carried for track recording and scores nothing; a
+secondary starts at its parent's time.
+
+Track recording (opt-in). History h < n_track owns slot h of the track
+arrays: trk_f[h, j] = (x, u, E, t) and trk_i[h, j] = (particle id in the
+family, parent id, event code EV_*, MT, region) of its j-th event. The
+primary is particle 0; each secondary gets the next id when it is
+created. record_event only reads the particle state: it draws no random
+number and writes no tally, so tallies are bit-identical with recording
+on or off (tests/test_tracks.py). A full slot range counts the dropped
+events in trk_trunc[h]; physics is unaffected.
 
 Random-number consumption per event (part of the regression contract):
   source energy   : monoenergetic 0; log-uniform 1 (drawn first)
@@ -73,6 +82,9 @@ from . import collision as C
 from .geometry import distance_to_boundary
 from .rng import RNG_DRAWS, RNG_SIZE, init_history, prn
 from .sources import sample_source
+from .tracks import (EV_ABSORB, EV_BORN, EV_COLLISION, EV_CUTOFF, EV_LEAK, EV_LOST,
+                     EV_SOURCE, EV_SURFACE, EV_ZERO_YIELD, TF_E, TF_T, TF_U, TF_X,
+                     TI_EVENT, TI_MT, TI_PARENT, TI_PID, TI_REGION)
 from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED,
                       K_BORN_BELOW_CUTOFF, K_COLLISIONS, K_CREATED, K_CUTOFF, K_ELASTIC,
                       K_INELASTIC, K_LEAK_LEFT, K_LEAK_RIGHT, K_LOST, K_MAX_BANK,
@@ -86,6 +98,8 @@ MASS_NEUTRON_EV = 939.56542052e6  # eV/c^2 (OpenMC constants.h, CODATA 2018)
 
 # secondary bank columns
 B_X, B_U, B_V, B_W, B_E, B_T, B_NCOL = 0, 1, 2, 3, 4, 5, 6
+
+MT_ABSORPTION = 101  # OpenMC's event MT for an absorption (N_DISAPPEAR)
 
 
 @njit(cache=True)
@@ -133,6 +147,27 @@ def macro_total(m, E, egrid, e_off, tot, m_off, mat_nuc, mat_dens, ci, cf, ct):
 
 
 @njit(cache=True)
+def record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, ev, mt, r, x, u, E, t):
+    """Append one event to recorded history `slot`. Reads the particle state
+    only: no random number, no tally. When the slot range is full, the event
+    is counted in trk_trunc instead."""
+    j = trk_n[slot]
+    if j >= trk_f.shape[1]:
+        trk_trunc[slot] += 1
+        return
+    trk_f[slot, j, TF_X] = x
+    trk_f[slot, j, TF_U] = u
+    trk_f[slot, j, TF_E] = E
+    trk_f[slot, j, TF_T] = t
+    trk_i[slot, j, TI_PID] = pid
+    trk_i[slot, j, TI_PARENT] = parent
+    trk_i[slot, j, TI_EVENT] = ev
+    trk_i[slot, j, TI_MT] = mt
+    trk_i[slot, j, TI_REGION] = r
+    trk_n[slot] = j + 1
+
+
+@njit(cache=True)
 def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           egrid, e_off, tot, absn, m_off, mat_nuc, mat_dens,
                           nuc_awr, nuc_kT, fg_threshold, free_gas,
@@ -140,10 +175,12 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           src_type, src_x, src_region, e_type, e_lo, e_hi,
                           e_cut, spec_edges,
                           reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
-                          bank_f, bank_r, ci, cf, ct, rng):
+                          bank_f, bank_r, bank_p, ci, cf, ct, rng,
+                          n_track, trk_f, trk_i, trk_n, trk_trunc):
     """Follow one source neutron and all its secondaries. Tallies go to this
-    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz). Returns
-    (draws used by the family, lost flag)."""
+    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz). If
+    history < n_track its events are recorded in track slot `history`.
+    Returns (draws used by the family, lost flag)."""
     init_history(rng, master_seed, np.uint64(history))
     n_regions = mat_of_region.shape[0]
     cap = bank_f.shape[0]
@@ -155,6 +192,13 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
     t = 0.0
     wgt = 1.0
     cnt[K_SOURCE] += 1
+    slot = history if history < n_track else -1
+    pid = 0
+    parent = -1
+    next_pid = 1
+    if slot >= 0:
+        record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, EV_SOURCE, 0, r,
+                     x, u, E, t)
     n_bank = 0
     lost = 0
     last_m = -1
@@ -201,6 +245,9 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                     if micro_a > prn(rng) * micro_t:
                         reg[ABSORPTION, r] += wgt
                         cnt[K_ABSORBED] += 1
+                        if slot >= 0:
+                            record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                         EV_ABSORB, MT_ABSORPTION, r, x, u, E, t)
                         break
                 c = C.sample_scatter_channel(k, i, f, n, micro_t, micro_a,
                                              ch_off, ch_int, chxs, rng)
@@ -220,12 +267,18 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                         E, u, v, w, nuc_awr[k], ch_q[c], ch_int[c, C.CH_CM],
                         ip, fp, prod, rng)
                     cnt[K_INELASTIC] += 1
+                if slot >= 0:
+                    record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                 EV_COLLISION, ch_int[c, C.CH_MT], r, x, u, E, t)
 
                 if n_out == 0:
                     # zero-yield event: the neutron ends, scored (never dropped)
                     zyw[r] += wgt
                     cnt[K_ZERO_YIELD] += 1
                     chz[c] += 1
+                    if slot >= 0:
+                        record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                     EV_ZERO_YIELD, ch_int[c, C.CH_MT], r, x, u, E, t)
                     break
                 if n_out > 1:
                     extra = n_out - 1
@@ -236,6 +289,13 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                         cutw[r] += wgt * extra
                         cnt[K_CUTOFF] += extra
                         cnt[K_BORN_BELOW_CUTOFF] += extra
+                        for _ in range(extra):
+                            if slot >= 0:
+                                record_event(trk_f, trk_i, trk_n, trk_trunc, slot, next_pid,
+                                             pid, EV_BORN, 0, r, x, u, E, t)
+                                record_event(trk_f, trk_i, trk_n, trk_trunc, slot, next_pid,
+                                             pid, EV_CUTOFF, 0, r, x, u, E, t)
+                            next_pid += 1
                     else:
                         if n_bank + extra > cap:
                             raise RuntimeError("secondary bank overflow (raise bank_capacity)")
@@ -247,12 +307,18 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                             bank_f[n_bank, B_E] = E
                             bank_f[n_bank, B_T] = t
                             bank_r[n_bank] = r
+                            bank_p[n_bank, 0] = next_pid
+                            bank_p[n_bank, 1] = pid
+                            next_pid += 1
                             n_bank += 1
                         if n_bank > cnt[K_MAX_BANK]:
                             cnt[K_MAX_BANK] = n_bank
                 if E < e_cut:
                     cutw[r] += wgt
                     cnt[K_CUTOFF] += 1
+                    if slot >= 0:
+                        record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                     EV_CUTOFF, 0, r, x, u, E, t)
                     break
             else:
                 if d_bdy == np.inf:
@@ -260,6 +326,9 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                     # possible for a source in a void with u exactly 0.
                     lost = 1
                     cnt[K_LOST] += 1
+                    if slot >= 0:
+                        record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                     EV_LOST, 0, r, x, u, E, t)
                     break
                 reg[TRACK_LENGTH, r] += wgt * d_bdy
                 if g >= 0:
@@ -275,6 +344,10 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                     surf[NEG, r] += wgt
                     x = bounds[r]
                     r -= 1
+                if slot >= 0:
+                    ev = EV_LEAK if (r < 0 or r >= n_regions) else EV_SURFACE
+                    record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, ev, 0, r,
+                                 x, u, E, t)
                 if r < 0:
                     cnt[K_LEAK_LEFT] += 1
                     break
@@ -293,6 +366,11 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
         E = bank_f[n_bank, B_E]
         t = bank_f[n_bank, B_T]
         r = bank_r[n_bank]
+        pid = bank_p[n_bank, 0]
+        parent = bank_p[n_bank, 1]
+        if slot >= 0:
+            record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, EV_BORN, 0, r,
+                         x, u, E, t)
     return int(rng[RNG_DRAWS]), lost
 
 
@@ -305,10 +383,12 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                     src_type, src_x, src_region, e_type, e_lo, e_hi,
                     e_cut, spec_edges, bank_capacity,
                     region_sums, surface_sums, spectrum, cutoff_weight, counts,
-                    chan_events, chan_created, zero_yield_weight, chan_zero):
+                    chan_events, chan_created, zero_yield_weight, chan_zero,
+                    n_track, trk_f, trk_i, trk_n, trk_trunc):
     """Run batches [batch_start, batch_end), writing only their rows. Same
     structure and guarantees as transport.run_batches: batch b runs
-    histories b*n .. b*n + n - 1, each seeded from (master_seed, id) only."""
+    histories b*n .. b*n + n - 1, each seeded from (master_seed, id) only.
+    Track slots of the histories run here are cleared first."""
     max_nuc = 0
     for m in range(m_off.shape[0] - 1):
         max_nuc = max(max_nuc, m_off[m + 1] - m_off[m])
@@ -334,11 +414,17 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
         rng = np.zeros(RNG_SIZE, np.uint64)
         bank_f = np.zeros((bank_capacity, B_NCOL), dtype=np.float64)
         bank_r = np.zeros(bank_capacity, dtype=np.int64)
+        bank_p = np.zeros((bank_capacity, 2), dtype=np.int64)
         ci = np.zeros(max(max_nuc, 1), dtype=np.int64)
         cf = np.zeros(max(max_nuc, 1), dtype=np.float64)
         ct = np.zeros(max(max_nuc, 1), dtype=np.float64)
         max_draws = 0
         first = b * histories_per_batch
+        for h in range(first, min(first + histories_per_batch, n_track)):
+            trk_f[h, :, :] = 0.0
+            trk_i[h, :, :] = 0
+            trk_n[h] = 0
+            trk_trunc[h] = 0
         for h in range(histories_per_batch):
             draws, lost = transport_history_kin(
                 first + h, master_seed, bounds, mat_of_region,
@@ -348,7 +434,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                 src_type, src_x, src_region, e_type, e_lo, e_hi,
                 e_cut, spec_edges,
                 reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
-                bank_f, bank_r, ci, cf, ct, rng)
+                bank_f, bank_r, bank_p, ci, cf, ct, rng,
+                n_track, trk_f, trk_i, trk_n, trk_trunc)
             if draws > max_draws:
                 max_draws = draws
         cnt[K_MAX_DRAWS] = max_draws

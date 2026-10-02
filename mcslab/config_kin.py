@@ -19,6 +19,7 @@ from .geometry import SlabGeometry
 from .nucdata import DEFAULT_TEMPERATURE_K, TEMPERATURE_TOLERANCE, temperature_key
 from .rng import STRIDE, validate_seed
 from .sources import BeamSource, IsotropicPlaneSource
+from .tracks import TF_NCOL, TI_NCOL, Tracks
 from .transport_kin import run_batches_kin
 from .xs import pack
 
@@ -53,6 +54,11 @@ class KinRunConfig:
         (OpenMC's free_gas_threshold, default 400).
     free_gas: False disables target motion everywhere (a diagnostic switch,
         mcslab only; it reproduces Part 1 exactly).
+    n_track: record the events of histories 0 .. n_track - 1 (see
+        mcslab/tracks.py). Recording draws no random number and touches no
+        tally.
+    track_capacity: events kept per recorded history (more are counted as
+        truncated).
     """
     geometry: SlabGeometry
     source: Source
@@ -68,6 +74,8 @@ class KinRunConfig:
     temperature_tolerance: float = TEMPERATURE_TOLERANCE
     free_gas_threshold: float = 400.0
     free_gas: bool = True
+    n_track: int = 0
+    track_capacity: int = 4000
 
     def __post_init__(self):
         if self.n_batches < 2:
@@ -76,6 +84,8 @@ class KinRunConfig:
             raise ValueError("histories_per_batch must be >= 1")
         if self.bank_capacity < 1:
             raise ValueError("bank_capacity must be >= 1")
+        if self.n_track < 0 or self.track_capacity < 1:
+            raise ValueError("n_track must be >= 0 and track_capacity >= 1")
         validate_seed(self.seed)
 
     @property
@@ -94,6 +104,7 @@ class KinResults(Results):
     chan_created: np.ndarray = None      # (B, n_channels) int64
     zero_yield_weight: np.ndarray = None  # (B, n_regions) ended by multiplicity 0
     chan_zero: np.ndarray = None         # (B, n_channels) int64 zero-yield events
+    tracks: Optional[Tracks] = None      # recorded events, if n_track > 0
     channel_labels: Tuple[Tuple[str, int], ...] = ()
     energy_edges: np.ndarray = None
     energy_cutoff: float = 0.0
@@ -223,6 +234,16 @@ def _refuse_unsupported(phys):
             f"implement:\n  {lines}")
 
 
+def _track_args(out):
+    """(n_track, f, i, n, truncated) for the kernel; empty arrays of the
+    right rank when nothing is recorded."""
+    t = out.tracks
+    if t is None:
+        return (0, np.zeros((0, 1, TF_NCOL)), np.zeros((0, 1, TI_NCOL), dtype=np.int64),
+                np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64))
+    return t.f.shape[0], t.f, t.i, t.n, t.truncated
+
+
 def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
             out: Optional[KinResults] = None) -> KinResults:
     """Run a kinematic CE problem. `batch_range=(b0, b1)` runs only those
@@ -245,11 +266,18 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
     n_ch = phys.ch_int.shape[0]
     if out is None:
         arrays = T.allocate_kin(config.n_batches, g.n_regions, edges.size - 1, n_ch)
+        n_track = min(int(config.n_track), config.n_histories)
+        cap = int(config.track_capacity) if n_track else 1
+        tracks = Tracks(np.zeros((n_track, cap, TF_NCOL)),
+                        np.zeros((n_track, cap, TI_NCOL), dtype=np.int64),
+                        np.zeros(n_track, dtype=np.int64), np.zeros(n_track, dtype=np.int64),
+                        bounds.copy(), tuple(m.name for m in g.region_materials), e_cut)
         out = KinResults(config, arrays[0], arrays[1], arrays[2], spectrum=arrays[3],
                          cutoff_weight=arrays[4], chan_events=arrays[5],
                          chan_created=arrays[6], zero_yield_weight=arrays[7],
                          chan_zero=arrays[8], channel_labels=phys.labels,
-                         energy_edges=edges, energy_cutoff=e_cut)
+                         energy_edges=edges, energy_cutoff=e_cut,
+                         tracks=tracks if n_track else None)
     b0, b1 = (0, config.n_batches) if batch_range is None else batch_range
     if not 0 <= b0 <= b1 <= config.n_batches:
         raise ValueError(f"bad batch range {batch_range}")
@@ -265,7 +293,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                     e_cut, edges, int(config.bank_capacity),
                     out.region_sums, out.surface_sums, out.spectrum, out.cutoff_weight,
                     out.diagnostics, out.chan_events, out.chan_created,
-                    out.zero_yield_weight, out.chan_zero)
+                    out.zero_yield_weight, out.chan_zero,
+                    *_track_args(out))
 
     if b1 > b0:
         worst = int(out.diagnostics[b0:b1, T.K_MAX_DRAWS].max())
