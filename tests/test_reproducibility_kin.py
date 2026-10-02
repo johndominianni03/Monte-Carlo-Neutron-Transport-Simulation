@@ -18,7 +18,7 @@ from mcslab.sources import BeamSource, IsotropicPlaneSource
 
 SEED = 20261015
 ARRAYS = ("region_sums", "surface_sums", "diagnostics", "spectrum", "cutoff_weight",
-          "chan_events", "chan_created")
+          "chan_events", "chan_created", "zero_yield_weight", "chan_zero")
 
 
 def _config(source, seed=SEED, **kw):

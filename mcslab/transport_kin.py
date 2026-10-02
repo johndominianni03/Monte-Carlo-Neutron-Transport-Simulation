@@ -12,6 +12,14 @@ are transported after their parent dies, continuing the history's random
 number stream (OpenMC particle.cpp event_check_limit_and_revive). A history
 family's results therefore depend on (master_seed, history id) only.
 
+Multiplicity (approved deviation D2). A channel's yield y at the incident
+energy gives n outgoing neutrons (collision.multiplicity): n >= 2 banks
+n - 1 copies; n = 0 ends the neutron (a zero-yield event, e.g. Fe or W
+MT 5 below about 6 MeV, where y = 0). OpenMC multiplies the weight by y
+there, so its particle dies with weight 0. mcslab scores the ended weight
+in zero_yield_weight[r] and counts it (K_ZERO_YIELD, chan_zero); it is
+never dropped silently (approved P2).
+
 Energy cutoff (approved deviation D5). After each collision, a neutron below
 e_cut is killed, as OpenMC's collision() does with its (default 0) cutoff. A
 secondary born below e_cut is not banked, as in OpenMC's create_secondary.
@@ -19,8 +27,9 @@ Neither is dropped silently: its weight is scored in cutoff_weight[r] for
 the region of the collision and counted in K_CUTOFF, so
 
     sources + created == absorbed + leaked_left + leaked_right + cutoff
+                         + zero_yield
 
-holds exactly (tests/test_kinematics.py test d).
+holds exactly (tests/test_kinematics.py test d, tests/test_laws.py test g).
 
 Direction is a full unit vector (u, v, w) with u along the slab normal. The
 source sets (mu, sqrt(1 - mu^2), 0) and draws nothing extra. The slab is
@@ -39,7 +48,12 @@ Random-number consumption per event (part of the regression contract):
   collision       : nuclide 1; absorption 1 if sigma_a > 0 for that
                     nuclide; scatter channel 1; then
                     elastic (target at rest): angle 2 (isotropic 1) + phi 1
-                    level inelastic:          angle 2 (isotropic 1) + phi 1
+                    other channels: applicability 1 (only if the product
+                    has several laws), then the law:
+                      level:              angle 2 (isotropic 1)
+                      continuous (law 4): angle 2 + energy 2
+                      correlated (law 61): 3
+                    then phi 1, then 1 for a non-integer yield
 """
 import math
 
@@ -53,7 +67,8 @@ from .sources import sample_source
 from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED,
                       K_BORN_BELOW_CUTOFF, K_COLLISIONS, K_CREATED, K_CUTOFF, K_ELASTIC,
                       K_INELASTIC, K_LEAK_LEFT, K_LEAK_RIGHT, K_LOST, K_MAX_BANK,
-                      K_MAX_DRAWS, K_SOURCE, NEG, POS, SPEC_COLL, SPEC_TL, TRACK_LENGTH)
+                      K_MAX_DRAWS, K_SOURCE, K_ZERO_YIELD, NEG, POS, SPEC_COLL, SPEC_TL,
+                      TRACK_LENGTH)
 from .transport_ce import sample_energy
 from .xs import grid_locate, interp_at
 
@@ -114,10 +129,10 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           nuc_awr, ch_off, ch_int, ch_q, chxs, ip, fp,
                           src_type, src_x, src_region, e_type, e_lo, e_hi,
                           e_cut, spec_edges,
-                          reg, surf, spec, cutw, cnt, chev, chcr,
+                          reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
                           bank_f, bank_r, ci, cf, ct, rng):
     """Follow one source neutron and all its secondaries. Tallies go to this
-    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr). Returns
+    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz). Returns
     (draws used by the family, lost flag)."""
     init_history(rng, master_seed, np.uint64(history))
     n_regions = mat_of_region.shape[0]
@@ -194,6 +209,12 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                         ip, fp, prod, rng)
                     cnt[K_INELASTIC] += 1
 
+                if n_out == 0:
+                    # zero-yield event: the neutron ends, scored (never dropped)
+                    zyw[r] += wgt
+                    cnt[K_ZERO_YIELD] += 1
+                    chz[c] += 1
+                    break
                 if n_out > 1:
                     extra = n_out - 1
                     chcr[c] += extra
@@ -271,7 +292,7 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                     src_type, src_x, src_region, e_type, e_lo, e_hi,
                     e_cut, spec_edges, bank_capacity,
                     region_sums, surface_sums, spectrum, cutoff_weight, counts,
-                    chan_events, chan_created):
+                    chan_events, chan_created, zero_yield_weight, chan_zero):
     """Run batches [batch_start, batch_end), writing only their rows. Same
     structure and guarantees as transport.run_batches: batch b runs
     histories b*n .. b*n + n - 1, each seeded from (master_seed, id) only."""
@@ -286,6 +307,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
         cnt = counts[b]
         chev = chan_events[b]
         chcr = chan_created[b]
+        zyw = zero_yield_weight[b]
+        chz = chan_zero[b]
         reg[:, :] = 0.0
         surf[:, :] = 0.0
         spec[:, :, :] = 0.0
@@ -293,6 +316,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
         cnt[:] = 0
         chev[:] = 0
         chcr[:] = 0
+        zyw[:] = 0.0
+        chz[:] = 0
         rng = np.zeros(RNG_SIZE, np.uint64)
         bank_f = np.zeros((bank_capacity, B_NCOL), dtype=np.float64)
         bank_r = np.zeros(bank_capacity, dtype=np.int64)
@@ -308,7 +333,7 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                 nuc_awr, ch_off, ch_int, ch_q, chxs, ip, fp,
                 src_type, src_x, src_region, e_type, e_lo, e_hi,
                 e_cut, spec_edges,
-                reg, surf, spec, cutw, cnt, chev, chcr,
+                reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
                 bank_f, bank_r, ci, cf, ct, rng)
             if draws > max_draws:
                 max_draws = draws

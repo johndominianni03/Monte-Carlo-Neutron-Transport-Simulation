@@ -32,6 +32,20 @@ What each test covers, and what it doesn't:
        scaled interpolation, the angle-table rule and the applicability
        mixture. It does not test the evaluated data themselves, or laws in
        transport (that is (g), the balance tests and the D7 regression).
+  packing: every reaction packs as inventoried, nothing unsupported; a
+       problem whose nuclide has an unimplemented law is refused even below
+       that reaction's threshold.
+  (g)  test_g_mt5_multiplicity: MT 5 of Fe56 and W184 at energies where
+       y(E) lies in (0,1), (1,2) and (2,3), on and between yield-table
+       points: n is floor(y) or floor(y) + 1 (exact) and its mean is y(E)
+       at 3 SE (approved deviation D2). test_g_zero_and_integer_yields_
+       draw_nothing: integer yields (including y = 0) make no extra draw.
+       test_g_kernel_multiplicity_and_balance: through the kernel on real
+       W | Fe (30 MeV) and FLiBe (14.1 MeV) slabs, every constant-yield
+       channel creates exactly (y - 1) secondaries per event, zero-yield
+       events come only from MT 5, and the per-batch balance including the
+       zero-yield term is exact. These runs use a 1 MeV energy cutoff, so
+       they say nothing about low-energy transport.
 """
 import math
 import os
@@ -785,3 +799,200 @@ def test_f_law_joint_distribution(report, note, nuclide, mt, desc, where):
     obs, exp = merge_sparse_cells(counts, expected)
     assert exp.min() >= 5.0
     chi2_check(report, f"{nuclide} MT {mt} (E,mu) {where} {E:.6g} eV", obs, exp, md)
+
+
+# ---------------------------------------------------------------------------
+# packing: every reaction, as inventoried; unimplemented laws refused
+# ---------------------------------------------------------------------------
+def test_every_reaction_packs_as_inventoried(note):
+    """Exact: every non-redundant neutron reaction of the 14 nuclides is a
+    scatter channel with a packed law of the inventoried kind, and nothing
+    is unsupported."""
+    lib = _library()
+    rows = law_inventory.scan(str(lib.root))
+    names = list(dict.fromkeys(r["nuclide"] for r in rows))
+    nucs = {n: lib.load(n, distributions=True) for n in names}
+    phys = C.pack_physics(names, nucs)
+    assert phys.unsupported == ()
+    assert len(phys.labels) == len(rows)
+    for row in rows:
+        c = phys.labels.index((row["nuclide"], row["mt"]))
+        prod = int(phys.ch_int[c, C.CH_PROD])
+        assert prod >= 0 and int(phys.ch_int[c, C.CH_CM]) == int(row["cm"])
+        ip = phys.ip
+        assert ip[prod + 2] == len(row["distributions"])
+        assert ip[prod] == (D.Y_CONST if row["yield"]["type"] == "Polynomial" else D.Y_TAB1)
+        for j, d in enumerate(row["distributions"]):
+            law = ip[prod + 4 + 2 * j]
+            if d["kind"] == "correlated":
+                assert ip[law] == D.LAW_CORRELATED
+            else:
+                expect = {"angle-only": D.E_NONE, "level": D.E_LEVEL,
+                          "continuous": D.E_CONTINUOUS}[d["kind"]]
+                assert ip[law] == D.LAW_UNCORRELATED and ip[law + 2] == expect
+    note(f"(packing) {len(rows)} channels of {len(names)} nuclides packed as inventoried; "
+         "0 unsupported")
+
+
+def test_unimplemented_law_refused_even_if_unreachable(tmp_path):
+    """A problem whose nuclide has an unimplemented law is refused, even when
+    the source is far below that reaction's threshold (with target motion,
+    reachability cannot be bounded by the source energy)."""
+    from mcslab.ce_materials import CEMaterial
+    from mcslab.config_ce import MonoEnergetic
+    from mcslab.config_kin import KinRunConfig, run_kin
+    from mcslab.geometry import SlabGeometry
+    from mcslab.sources import BeamSource
+    lib = _library()
+    (tmp_path / "neutron").mkdir()
+    path = tmp_path / "neutron" / "Be9.h5"
+    shutil.copyfile(lib.nuclide_path("Be9"), path)
+    _edit_attr(path, BE16 + "/energy_out", "n_discrete_lines",
+               lambda a: np.where(np.arange(a.size) == 0, 1, a))
+    edited = N.Library.open(tmp_path, label="edited")
+    be = CEMaterial("Be", 1.85, (("Be9", 1.0),))
+    cfg = KinRunConfig(SlabGeometry([0.0, 1.0], [be]), BeamSource(), MonoEnergetic(1.0e5),
+                       edited, n_batches=2, histories_per_batch=10)
+    with pytest.raises(NotImplementedError, match="Be9 MT 16.*discrete lines"):
+        run_kin(cfg)
+
+
+# ---------------------------------------------------------------------------
+# (g) multiplicities
+# ---------------------------------------------------------------------------
+# Seed fixed in docs/phase2b_plan.md before this test existed.
+SEED_G = 20261021
+N_YIELD = 100_000
+G_MT5 = [
+    # (nuclide, E (eV), where y falls), y read from the raw HDF5 table
+    ("Fe56", 14.1e6, "(0,1), between table points"),
+    ("Fe56", 30.0e6, "(1,2), on a table point"),
+    ("Fe56", 70.0e6, "(2,3), on a table point"),
+    ("W184", 14.0e6, "(0,1), on a table point"),
+    ("W184", 30.0e6, "(1,2), between table points"),
+    ("W184", 32.0e6, "(2,3), on a table point"),
+]
+
+
+def raw_yield(lib, nuclide, mt, E):
+    with h5py.File(lib.nuclide_path(nuclide), "r") as f:
+        y = f[f"{nuclide}/reactions/reaction_{mt:03d}/product_0/yield"]
+        assert int(np.ravel(y.attrs["interpolation"])[0]) == 2
+        x, v = y[()]
+    return float(np.interp(E, x, v))
+
+
+@pytest.mark.parametrize("nuclide,E,where", G_MT5)
+def test_g_mt5_multiplicity(report, note, nuclide, E, where):
+    """MT 5 (energy-dependent yield, approved deviation D2). Per event the
+    number of neutrons is floor(y) or floor(y) + 1 (exact), and its mean is
+    y(E) at 3 SE, with y interpolated lin-lin in the test from the raw HDF5
+    table (np.interp)."""
+    lib, phys = _packed_real([nuclide])
+    c = phys.labels.index((nuclide, 5))
+    prod = int(phys.ch_int[c, C.CH_PROD])
+    y = raw_yield(lib, nuclide, 5, E)
+    lo, hi = (int(where[1]), int(where[3]))
+    assert lo < y < hi, (y, where)
+    _, _, n_out, md = _inelastic(phys.ip, phys.fp, prod, E, float(phys.nuc_awr[0]),
+                                 float(phys.ch_q[c]), int(phys.ch_int[c, C.CH_CM]),
+                                 np.uint64(SEED_G), N_YIELD)
+    fl = math.floor(y)
+    assert set(np.unique(n_out)) <= {fl, fl + 1}
+    mean = float(n_out.mean())
+    se = float(n_out.std(ddof=1) / math.sqrt(N_YIELD))
+    report(f"{nuclide} MT 5 mean n at {E / 1e6:g} MeV", mean, y, se, md)
+    assert abs(mean - y) <= 3.0 * se, (mean, y, se)
+
+
+def test_g_zero_and_integer_yields_draw_nothing():
+    """Exact: where y is an integer (MT 5 below 6 MeV: y = 0; MT 16: y = 2)
+    no multiplicity draw is made: 3 law draws + 1 for phi."""
+    lib, phys = _packed_real(["Fe56", "W184"])
+    for name, mt, E, y in (("Fe56", 5, 5.0e6, 0), ("W184", 5, 5.0e6, 0),
+                           ("Fe56", 16, 14.1e6, 2), ("W184", 16, 14.1e6, 2)):
+        c = phys.labels.index((name, mt))
+        k = int(phys.ch_int[c, C.CH_NUC])
+        _, _, n_out, md = _inelastic(phys.ip, phys.fp, int(phys.ch_int[c, C.CH_PROD]), E,
+                                     float(phys.nuc_awr[k]), float(phys.ch_q[c]),
+                                     int(phys.ch_int[c, C.CH_CM]), np.uint64(SEED_G), 2000)
+        assert np.all(n_out == y) and md == 4, (name, mt, md)
+
+
+def _kernel_problem(kind):
+    from mcslab import ce_materials as cm
+    from mcslab.config_ce import MonoEnergetic
+    from mcslab.config_kin import KinRunConfig
+    from mcslab.geometry import SlabGeometry
+    from mcslab.sources import BeamSource
+    lib = _library()
+    if kind == "W|Fe 30 MeV":
+        geom = SlabGeometry([0.0, 2.0, 5.0], [cm.tungsten(), cm.iron()])
+        E0 = 30.0e6
+    else:
+        geom = SlabGeometry([0.0, 10.0], [cm.flibe()])
+        E0 = 14.1e6
+    return KinRunConfig(geom, BeamSource(), MonoEnergetic(E0), lib, n_batches=20,
+                        histories_per_batch=500, seed=SEED_G, energy_cutoff=1.0e6)
+
+
+G_KERNEL = {
+    "W|Fe 30 MeV": [("W184", 16), ("W184", 17), ("W184", 37), ("W184", 41), ("Fe56", 16)],
+    "FLiBe 14.1 MeV": [("Be9", 16), ("Li6", 24), ("Li7", 16), ("Li7", 24), ("F19", 16)],
+}
+
+
+@pytest.mark.parametrize("kind", sorted(G_KERNEL))
+def test_g_kernel_multiplicity_and_balance(report, kind):
+    """Exact, through the kernel on real data (energy cutoff 1 MeV to keep
+    the runs short): every channel with a constant integer yield y creates
+    exactly (y - 1) secondaries per event and never a zero-yield event;
+    zero-yield events come only from MT 5; per batch,
+    sources + created == absorbed + leaks + cutoff + zero_yield, each term
+    from a tally and equal to its int64 counter."""
+    import warnings
+    from mcslab import tallies as T
+    from mcslab.config_kin import EnergyCutoffWarning, run_kin
+    cfg = _kernel_problem(kind)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", EnergyCutoffWarning)
+        res = run_kin(cfg)
+    from mcslab.rng import STRIDE
+    assert res.lost == 0 and res.max_draws < STRIDE
+    nucs = {}
+    lib = _library()
+    for c, (name, mt) in enumerate(res.channel_labels):
+        if name not in nucs:
+            nucs[name] = lib.load(name, distributions=True)
+        prod = nucs[name].reactions[mt].products[0]
+        ev, made = res.channel_counts(name, mt)
+        zero = res.channel_zero(name, mt)
+        if prod.yield_table is None:
+            y = int(prod.yield_coefficients[0])
+            assert made == (y - 1) * ev and zero == 0, (name, mt, ev, made, zero)
+        else:
+            assert mt == 5
+    for name, mt in G_KERNEL[kind]:
+        assert res.channel_counts(name, mt)[0] > 0, (name, mt)
+    counts = res.diagnostics
+    src = counts[:, T.K_SOURCE].astype(np.float64)
+    created = counts[:, T.K_CREATED].astype(np.float64)
+    absorbed = res.region_sums[:, T.ABSORPTION, :].sum(axis=1)
+    left, right = res.surface_sums[:, T.NEG, 0], res.surface_sums[:, T.POS, -1]
+    cut = res.cutoff_weight.sum(axis=1)
+    zero = res.zero_yield_weight.sum(axis=1)
+    assert np.array_equal(zero, counts[:, T.K_ZERO_YIELD].astype(np.float64))
+    assert np.array_equal(cut, counts[:, T.K_CUTOFF].astype(np.float64))
+    assert np.array_equal(absorbed, counts[:, T.K_ABSORBED].astype(np.float64))
+    assert int(res.chan_zero.sum()) == res.count(T.K_ZERO_YIELD)
+    assert np.array_equal(src + created, absorbed + left + right + cut + zero)
+    if kind.startswith("W"):
+        assert res.count(T.K_ZERO_YIELD) > 0
+    b = res.balance()
+    assert b["residual"] == 0.0
+    n = cfg.n_histories
+    report("sources + created", b["source"] + b["created"],
+           b["absorbed"] + b["leak_left"] + b["leak_right"] + b["cutoff"] + b["zero_yield"],
+           0.0, res.max_draws, b["cutoff"] / n)
+    report("  created per source", b["created"] / n, b["created"] / n, 0.0)
+    report("  zero-yield per source", b["zero_yield"] / n, res.count(T.K_ZERO_YIELD) / n, 0.0)

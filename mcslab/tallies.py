@@ -39,6 +39,9 @@ N_DIAG = 2
 #                            config.Results.max_draws / .lost work unchanged
 #   chan_events[b, c]        int64 collisions that chose scatter channel c
 #   chan_created[b, c]       int64 secondaries created by channel c
+#   zero_yield_weight[b, r]  weight ended by zero-yield events in region r
+#                            (a sampled multiplicity of 0, approved P2)
+#   chan_zero[b, c]          int64 zero-yield events of channel c
 SPEC_TL = 0          # sum of w * l in the energy bin (track-length flux numerator)
 SPEC_COLL = 1        # sum of w / Sigma_t at collisions in the bin
 N_SPEC = 2
@@ -56,10 +59,11 @@ K_ELASTIC = 9        # elastic scatters
 K_INELASTIC = 10     # non-elastic scatters (any multiplicity)
 K_MAX_BANK = 11      # largest secondary-bank occupancy seen in the batch
 K_BORN_BELOW_CUTOFF = 12  # secondaries created below the cutoff (also in K_CUTOFF)
-N_COUNTS = 13
+K_ZERO_YIELD = 13    # particles ended by a zero-yield event (multiplicity 0)
+N_COUNTS = 14
 COUNT_NAMES = ("max_draws", "lost", "source", "created", "absorbed", "leak_left",
                "leak_right", "cutoff", "collisions", "elastic", "inelastic", "max_bank",
-               "born_below_cutoff")
+               "born_below_cutoff", "zero_yield")
 
 
 def allocate(n_batches, n_regions):
@@ -71,15 +75,17 @@ def allocate(n_batches, n_regions):
 
 def allocate_kin(n_batches, n_regions, n_ebins, n_channels):
     """-> region_sums, surface_sums, counts, spectrum, cutoff_weight,
-    chan_events, chan_created, all zeroed."""
+    chan_events, chan_created, zero_yield_weight, chan_zero, all zeroed."""
     region_sums, surface_sums, _ = allocate(n_batches, n_regions)
     counts = np.zeros((n_batches, N_COUNTS), dtype=np.int64)
     spectrum = np.zeros((n_batches, N_SPEC, n_regions, n_ebins), dtype=np.float64)
     cutoff_weight = np.zeros((n_batches, n_regions), dtype=np.float64)
     chan_events = np.zeros((n_batches, n_channels), dtype=np.int64)
     chan_created = np.zeros((n_batches, n_channels), dtype=np.int64)
+    zero_yield_weight = np.zeros((n_batches, n_regions), dtype=np.float64)
+    chan_zero = np.zeros((n_batches, n_channels), dtype=np.int64)
     return (region_sums, surface_sums, counts, spectrum, cutoff_weight,
-            chan_events, chan_created)
+            chan_events, chan_created, zero_yield_weight, chan_zero)
 
 
 def batch_stats(x):

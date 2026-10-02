@@ -18,8 +18,8 @@ pre-summed `absn` table of xs.pack.
                     points thr .. n-1 of the nuclide grid
         cm        : 1 if the law's frame is centre of mass
         prod      : PRODUCT record in the distribution pools, or -1 if the
-                    law is not implemented (the driver refuses problems
-                    that can reach it, and the kernel raises if one is hit)
+                    law is not implemented (the driver refuses any problem
+                    that contains one, and the kernel raises if one is hit)
     ch_q[c]   = Q value (eV)
 
 Velocities use OpenMC's units, v = sqrt(E) with E in eV.
@@ -30,7 +30,8 @@ normal, so the 3D vector code below is OpenMC's own.
 Random numbers used per collision, in order:
     nuclide 1; absorption 1 if sigma_a > 0; scatter channel 1; then
     elastic (target at rest): angle (2, or 1 if isotropic) + phi 1
-    inelastic:                law (see distributions.py) + phi 1
+    inelastic:                law (see distributions.py) + phi 1, then 1
+                              for a non-integer yield (multiplicity)
 """
 from __future__ import annotations
 
@@ -107,18 +108,6 @@ def _check_laws(name, mt, product):
             raise D.Unsupported("non-elastic law without an energy distribution")
 
 
-def _kernel_ready(product) -> bool:
-    """Laws the transport kernel handles at this commit: Part 1's (one
-    uncorrelated law, isotropic or tabular angle, no energy law or a level
-    law, constant positive integer yield). The samplers handle every
-    packed law; the kernel learns zero-yield events in the next commit."""
-    y = product.yield_coefficients
-    return (product.yield_table is None and len(y) == 1 and y[0] >= 1.0
-            and math.floor(y[0]) == y[0] and len(product.laws) == 1
-            and isinstance(product.laws[0], N.UncorrelatedAngleEnergy)
-            and (product.laws[0].energy is None or _is_level(product.laws[0])))
-
-
 def pack_physics(names: Sequence[str], nuclides: dict) -> PackedPhysics:
     """Scatter channels and their laws for the nuclides `names` (in xs.pack
     order). Laws mcslab cannot sample are recorded in `unsupported`."""
@@ -148,9 +137,6 @@ def pack_physics(names: Sequence[str], nuclides: dict) -> PackedPhysics:
             except D.Unsupported as exc:
                 prod = -1
                 unsupported.append((c, f"{name} MT {mt}: {exc}"))
-            if prod >= 0 and not _kernel_ready(products[0]):
-                unsupported.append((c, f"{name} MT {mt}: law packed but not yet wired "
-                                       "into the transport kernel"))
             if prod >= 0 and any(_is_level(law) for law in products[0].laws):
                 # level law: E_cm >= 0 needs E >= -Q (A+1)/A wherever xs > 0
                 thr = -rx.q_value * (nuc.awr + 1.0) / nuc.awr

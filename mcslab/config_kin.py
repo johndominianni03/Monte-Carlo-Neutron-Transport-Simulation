@@ -79,6 +79,8 @@ class KinResults(Results):
     cutoff_weight: np.ndarray = None     # (B, n_regions)
     chan_events: np.ndarray = None       # (B, n_channels) int64
     chan_created: np.ndarray = None      # (B, n_channels) int64
+    zero_yield_weight: np.ndarray = None  # (B, n_regions) ended by multiplicity 0
+    chan_zero: np.ndarray = None         # (B, n_channels) int64 zero-yield events
     channel_labels: Tuple[Tuple[str, int], ...] = ()
     energy_edges: np.ndarray = None
     energy_cutoff: float = 0.0
@@ -109,15 +111,21 @@ class KinResults(Results):
         left = float(self.surface_sums[:, T.NEG, 0].sum())
         right = float(self.surface_sums[:, T.POS, -1].sum())
         cut = float(self.cutoff_weight.sum())
+        zero = float(self.zero_yield_weight.sum())
         lost = float(self.count(T.K_LOST))
         return {"source": src, "created": created, "absorbed": absorbed,
-                "leak_left": left, "leak_right": right, "cutoff": cut, "lost": lost,
-                "residual": src + created - (absorbed + left + right + cut + lost)}
+                "leak_left": left, "leak_right": right, "cutoff": cut, "zero_yield": zero,
+                "lost": lost,
+                "residual": src + created - (absorbed + left + right + cut + zero + lost)}
 
     def channel_counts(self, nuclide: str, mt: int) -> Tuple[int, int]:
         """(events, secondaries created) summed over batches for one channel."""
         c = self.channel_labels.index((nuclide, mt))
         return int(self.chan_events[:, c].sum()), int(self.chan_created[:, c].sum())
+
+    def channel_zero(self, nuclide: str, mt: int) -> int:
+        """Zero-yield events of one channel, summed over batches."""
+        return int(self.chan_zero[:, self.channel_labels.index((nuclide, mt))].sum())
 
 
 _CACHE = {}
@@ -159,16 +167,16 @@ def _energy_cutoff(config, nuclides) -> float:
     return e_cut
 
 
-def _refuse_unsupported(phys, e_hi):
-    """Part 1 energies never increase (target at rest), so a channel whose xs
-    is positive only above the highest source energy can never be sampled."""
-    reach = [(reason, phys.first_positive[c]) for c, reason in phys.unsupported
-             if phys.first_positive[c] < e_hi]
-    if reach:
-        lines = "\n  ".join(f"{r} (xs > 0 above {e:.6g} eV)" for r, e in reach)
+def _refuse_unsupported(phys):
+    """Refuse any problem whose nuclides have a channel with a law mcslab
+    does not implement, whether or not the source can reach it: with target
+    motion, energies are no longer monotone, so reachability cannot be
+    bounded by the source energy."""
+    if phys.unsupported:
+        lines = "\n  ".join(reason for _, reason in phys.unsupported)
         raise NotImplementedError(
-            f"the source reaches reactions whose laws are not implemented yet "
-            f"(max source energy {e_hi:.6g} eV):\n  {lines}")
+            f"the problem's nuclides have reactions whose laws mcslab does not "
+            f"implement:\n  {lines}")
 
 
 def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
@@ -184,7 +192,7 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
         raise ValueError(f"source energies [{e_lo}, {e_hi}] eV fall outside the "
                          f"common data range [{p.e_min}, {p.e_max}] eV")
     e_cut = _energy_cutoff(config, nuclides)
-    _refuse_unsupported(phys, e_hi)
+    _refuse_unsupported(phys)
     edges = (np.array([e_cut, p.e_max], dtype=np.float64) if config.energy_edges is None
              else np.asarray(config.energy_edges, dtype=np.float64))
     if edges.ndim != 1 or edges.size < 2 or (np.diff(edges) <= 0.0).any():
@@ -195,7 +203,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
         arrays = T.allocate_kin(config.n_batches, g.n_regions, edges.size - 1, n_ch)
         out = KinResults(config, arrays[0], arrays[1], arrays[2], spectrum=arrays[3],
                          cutoff_weight=arrays[4], chan_events=arrays[5],
-                         chan_created=arrays[6], channel_labels=phys.labels,
+                         chan_created=arrays[6], zero_yield_weight=arrays[7],
+                         chan_zero=arrays[8], channel_labels=phys.labels,
                          energy_edges=edges, energy_cutoff=e_cut)
     b0, b1 = (0, config.n_batches) if batch_range is None else batch_range
     if not 0 <= b0 <= b1 <= config.n_batches:
@@ -209,7 +218,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                     src_type, src_x, src_region, e_type, e_lo, e_hi,
                     e_cut, edges, int(config.bank_capacity),
                     out.region_sums, out.surface_sums, out.spectrum, out.cutoff_weight,
-                    out.diagnostics, out.chan_events, out.chan_created)
+                    out.diagnostics, out.chan_events, out.chan_created,
+                    out.zero_yield_weight, out.chan_zero)
 
     if b1 > b0:
         worst = int(out.diagnostics[b0:b1, T.K_MAX_DRAWS].max())
