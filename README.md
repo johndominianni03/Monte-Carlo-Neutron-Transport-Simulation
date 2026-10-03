@@ -5,6 +5,41 @@ goal is modelling 14.1 MeV D-T fusion neutrons in a first wall / blanket
 (heating, dpa, helium production, tritium breeding ratio) with ENDF/B-VIII.0
 data.
 
+![Neutron tracks in W | FLiBe | Fe](docs/figures/tracks.gif)
+
+*Neutron histories from a 14.1 MeV beam entering W | FLiBe | Fe: depth
+against log energy over time (`scripts/animate_tracks.py`).*
+
+## Status and open items
+
+Phases 1 to 4 are complete. The code transports neutrons in continuous
+energy with every outgoing-neutron law in the data, scores heating,
+damage, helium and tritium, and agrees with OpenMC 0.16.0 on the same
+data: all 82 primary benchmark checks pass (largest |z| 2.63). The rules
+for seeds, statistical checks, regression references and the benchmark
+failure protocol are in `docs/development.md`.
+
+Open items and limits that affect how the results can be used:
+
+- **The 14.1 MeV cross-section hand-check is pending.** No value has yet
+  been compared by hand with an independent ENDF/B-VIII.0 source (see
+  "Hand-checking cross sections").
+- **Heating is a bracket, not a number.** There is no photon transport,
+  so heating is reported between MT 301 and MT 901 (a factor of 16 wide
+  for W and 6.5 for Fe in D7).
+- **The blanket sweep is an idealised 1D upper bound, not a TBR.** A
+  reflective plane returns every neutron that leaves the plasma side, and
+  there is no structure, coolant, ports or gaps.
+- **No unresolved-resonance probability tables.** Measured effect, from
+  OpenMC with its tables on against off (P1): W absorption -0.92%
+  (1.2 SE), left leakage +0.59% (3.6 SE), the other 24 quantities at most
+  0.52%.
+- **An unexplained per-bin excursion in benchmark problem P1.** 13.4% of
+  P1's per-bin z values exceed 2 (4.6% expected), the largest is 4.33,
+  and P2, with the same slab and independent seeds, shows the opposite
+  sign in the Fe. No primary check failed, so it was not followed up. It
+  is an open item, not established noise (see "What differs, and why").
+
 ## Current scope
 
 ### Phase 1: transport engine (one-group)
@@ -108,8 +143,6 @@ Phase 1 and Phase 2a kernels are unchanged.
   (depth vs log energy over time) and `docs/figures/tracks.png`.
 - **Regression reference** for the kinematic kernel, problem D7 (below).
 
-![Neutron tracks in W | FLiBe | Fe](docs/figures/tracks.gif)
-
 ### Phase 3, Part A: response tallies (heating, damage, helium, tritium)
 
 - **What is tallied.** With `KinRunConfig.depth_bins` set, the kinematic
@@ -195,8 +228,9 @@ export MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5
 ```
 
 The extracted files are checked against the sha256 sums pinned in
-`scripts/checksums/endfb-viii.0.sha256`. Without `MCSLAB_DATA`, the Phase 2a
-tests skip and the Phase 1 tests run as before.
+`scripts/checksums/endfb-viii.0.sha256`. Without `MCSLAB_DATA`, every test
+that needs the data skips (111 of 208; see "Tests") and the Phase 1 tests
+run as before.
 
 ## Usage
 
@@ -383,6 +417,9 @@ the same way, not that the data match experiment.
 - No physics difference was found.
 - The differences found are definitions and conventions (listed below),
   not physics.
+- One pattern is unexplained: P1's per-bin z values are wider than
+  independent noise, on the plasma side and in the Fe. It is an open item
+  (below), not followed up because no primary check failed.
 
 ### Setup
 
@@ -520,13 +557,11 @@ Ratio figures for the other problems: `docs/figures/phase4_ratio_P2.png`,
 
 ### What differs, and why
 
-None of these is a physics difference.
+No physics difference was found. The first item below is unexplained; the
+others are definitions and conventions.
 
-- **Run-wide fluctuations move many bins together** (per-bin
+- **Open item: P1's per-bin excursion is unexplained** (per-bin
   diagnostics: 2055-3012 z values per fusion problem, no pass/fail).
-  - Neighbouring bins share histories. One fluctuation, such as a few more
-    fast neutrons reaching the Fe, moves every fast-neutron quantity of
-    every Fe isotope in every Fe bin in the same direction.
   - In P1, the Fe layer's fast-neutron scores sit about +2 SE high per bin.
     The plasma-side region is +2 to +3.5 SE high (W flux, left leakage, the
     first FLiBe bins; largest per-bin |z| 4.33).
@@ -538,6 +573,14 @@ None of these is a physics difference.
   - P4 has the other vacuum plasma side, and its left leakage is at
     -0.10 SE.
   - P2, P3 and P4 have 3.3%, 1.3% and 6.7% of per-bin z beyond 2.
+  - Neighbouring bins share histories, so one run-wide fluctuation (a few
+    more fast neutrons reaching the Fe, say) moves every fast-neutron
+    quantity in every Fe bin together. That is a possible explanation,
+    not a demonstrated one.
+  - It was not followed up: no primary check failed, so the failure
+    protocol did not apply. A rerun of P1 in both codes on its declared
+    second seed pair would separate a fluctuation from a real
+    plasma-side difference; it has not been done.
   - Any real difference at P1's plasma side is below about 0.8% (the
     observed +0.33% in W flux plus 3 SE).
 - **"Uncollided" means different things** (deviation 16).
@@ -659,6 +702,14 @@ MCSLAB_DATA=... <openmc-env>/bin/python benchmark/run_openmc.py run --problem P4
   paths, user names, dates or timings.
 
 ## Tests: what they do and do not cover
+
+With the nuclear data (`MCSLAB_DATA` set), all 208 tests pass. Without
+it, the 111 tests that need the data skip and the other 97 pass; pytest
+reports "97 passed, 58 skipped", because `tests/test_nucdata.py` (54
+tests) skips as a whole and counts once. The Phase 2a and later
+regression harnesses refuse to run without the data. Seeds and
+thresholds of every statistical check were fixed in the phase plan
+before the test existed; the rules are in `docs/development.md`.
 
 - `tests/test_physics.py` checks the Phase 1 engine against analytic results
   (see its docstring).
@@ -879,6 +930,9 @@ the tests were written):
 
 ## Hand-checking cross sections against an independent source
 
+**Status: pending.** None of the values below has yet been compared by
+hand with an independent source.
+
 These are values at 14.1 MeV from mcslab (ENDF/B-VIII.0, 294 K, lin-lin on
 the NJOY grid):
 
@@ -979,7 +1033,9 @@ Dividing an eV-b value by sigma_t gives eV per collision.
   energies (resonances, thermal) this mismatch is real and is not corrected.
 - **No unresolved-resonance probability tables.** URR tables exist in the
   files for Fe58 and W182-186 but are not used, so there is no self-shielding
-  in the unresolved range.
+  in the unresolved range. Measured in Phase 4 (OpenMC, P1, tables on
+  against off): W absorption -0.92% (1.2 SE), left leakage +0.59%
+  (3.6 SE), the other 24 quantities at most 0.52%.
 - **No thermal scattering (S(alpha,beta))**, no unionized energy grid, no
   fission (none of the nuclides fission), and no photon transport.
 - **Materials.** W and Fe densities are room-temperature handbook values.
@@ -1087,7 +1143,9 @@ Dividing an eV-b value by sigma_t gives eV per collision.
   expected values from the processed response data. No triton, alpha or
   recoil is transported, and no damage cascade is simulated.
 - **No URR probability tables** (as before); they would change Fe-58 and W
-  self-shielding in the keV-MeV range.
+  self-shielding in the keV-MeV range. The measured effect in D7 is a few
+  tenths of a percent (Phase 4, "What OpenMC's default settings would
+  change").
 - **Statistics.** README standard errors come from 20 batches. The
   validation tests use 100.
 - **Not validated against experiment.** The tests show that the tallies
