@@ -133,9 +133,11 @@ Phase 1 and Phase 2a kernels are unchanged.
   these data that is MT 205 of every W isotope, which is flagged in the
   results as "no data".
 - **Also tallied:** the flux, and uncollided forms of both estimators
-  (source neutrons before their first collision), which correspond to
-  OpenMC's `CollisionFilter` bins 0 and 1. The per-layer flux spectrum is
-  the existing spectrum tally on a 20-bins-per-decade grid.
+  (source neutrons before their first collision). These are not OpenMC
+  0.16.0's `CollisionFilter` bins 0 and 1, which also hold the first
+  flights and first collisions of neutrons banked by (n,2n)-type reactions
+  (deviation 16; Phase 3 stated the opposite). The per-layer flux spectrum
+  is the existing spectrum tally on a 20-bins-per-decade grid.
 - **Reproducibility.** The response cross sections are interpolated with
   the grid index and factor the transport step already computed. The
   tallies draw no random number and write only their own batch row. With

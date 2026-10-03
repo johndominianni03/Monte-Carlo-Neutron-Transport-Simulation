@@ -107,12 +107,8 @@ These follow OpenMC's algorithm and random-number order:
   `bins_crossed` / `raytrace_mesh`, `src/mesh.cpp`), and a collision is
   binned by its position (`get_bin`). The Phase 4 equivalent of the depth
   mesh is a RectilinearMesh with the same x edges.
-- **Uncollided estimators.** mcslab's uncollided track-length estimator
-  equals OpenMC's `CollisionFilter` bin 0 with a track-length estimator.
-  Its first-collision estimator equals bin 1 with a collision estimator.
-  This is because secondaries inherit `n_collision` (`src/particle.cpp`),
-  and `collision()` increments it before the collision tally
-  (`src/physics.cpp`).
+- **Uncollided estimators.** Not OpenMC's `CollisionFilter` bins; see
+  deviation 16.
 
 ## Deviations
 
@@ -226,13 +222,26 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
   - Neither code counts zero-yield events as absorption.
   - In D7 they end 0.0046 neutrons per source.
 
-### 6. Random-number streams
+### 6. Random-number generator and streams
 
-- **OpenMC** keeps separate streams per particle (source, tracking, URR,
-  ...), each seeded by its own scheme.
-- **mcslab** uses one stream per history (OpenMC's LCG and stride,
-  `mcslab/rng.py`), and secondaries continue it.
-- **Effect:** results agree statistically, never bit for bit.
+- **OpenMC 0.16.0** (`src/random_lcg.cpp`):
+  - generator: PCG-RXS-M-XS. A 64-bit LCG (multiplier
+    6364136223846793005, increment 1442695040888963407) whose output is
+    permuted before it is turned into a number in [0, 1) (`prn`)
+  - streams: four per particle (tracking, source, URR, volume), seeded
+    from the master seed plus the stream index, `152917 x` the particle's
+    global index steps ahead (`init_particle_seeds`,
+    `compute_transport_seed` in `src/simulation.cpp`)
+- **mcslab** (`mcslab/rng.py`):
+  - generator: the 63-bit LCG s' = (2806196910506780709 s + 1) mod 2^63,
+    with the top 53 bits of the state as the number. It is a different
+    generator from OpenMC 0.16.0's.
+  - streams: one per history, starting `history x 152917` steps ahead
+    (the same stride as OpenMC), continued by its secondaries
+- **Effect:** results agree statistically, never bit for bit. Because the
+  generators differ, the two codes cannot replay each other's random
+  numbers whatever the seeds, so a benchmark pair is independent by
+  construction.
 
 ### 7. Round-off guards in channel selection
 
@@ -357,3 +366,29 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
     random number
 - **Effect:** none on volume tallies. A surface-current comparison at a
   reflective surface must count reflections the same way in both codes.
+
+### 16. Uncollided estimators count source neutrons only (correction, Phase 4)
+
+- **OpenMC 0.16.0** (`src/particle.cpp`, `Particle::create_secondary`;
+  `include/openmc/particle_data.h`, `SourceSite`): a banked secondary's
+  `n_collision` is never set, so it keeps the default 0. Only
+  `Particle::split` copies the parent's count. Every neutron banked by an
+  (n,2n)-type reaction therefore starts with `n_collision = 0`:
+  - `CollisionFilter` bin 0 with a track-length estimator holds the first
+    flights of source neutrons **and** of those secondaries
+  - bin 1 with a collision estimator holds the first collisions of both
+- **mcslab:** the uncollided estimators (`EST_TL_UNC`, `EST_COLL_UNC`) score
+  source neutrons only, before their first collision. Their expected value
+  is the first-flight formula, which Phase 3 checks to 3 SE per bin.
+- **Phase 3 said otherwise.** It stated that the two estimators equal
+  bins 0 and 1, citing the copy in `split()`. That was wrong for
+  `create_secondary`. In a D7 smoke run, OpenMC's bin 0 exceeded the
+  first-flight formula by 9-12% per bin in W, 13% in FLiBe and 80% in Fe.
+- **Equivalent OpenMC tally:** bin 0 restricted to a band of +-1e-9
+  (relative) around the source energy. Source neutrons that never
+  collided have exactly that energy. A banked neutron's energy comes from
+  a discrete level or a continuous outgoing-energy table, so it lands in
+  the band (+-14 meV at 14.1 MeV) with negligible probability. Phase 4
+  compares that.
+- **Effect:** none on any other tally; the difference is in what the
+  uncollided diagnostic means.

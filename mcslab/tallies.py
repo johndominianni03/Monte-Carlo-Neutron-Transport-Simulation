@@ -87,8 +87,9 @@ N_RESP = 6
 RESPONSE_NAMES = ("heating", "heating-local", "damage-energy", "H3-production",
                   "He4-production", "absorption")
 # Estimators. *_UNC score only source neutrons before their first
-# collision: TL_UNC on their flights, COLL_UNC at that first collision
-# (OpenMC CollisionFilter bin 0 with track length, bin 1 with collision).
+# collision: TL_UNC on their flights, COLL_UNC at that first collision.
+# OpenMC 0.16.0's CollisionFilter bins 0 and 1 also count neutrons banked
+# by (n,2n)-type reactions (docs/deviations_from_openmc.md, deviation 16).
 EST_TL = 0
 EST_COLL = 1
 EST_TL_UNC = 2
