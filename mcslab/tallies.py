@@ -66,6 +66,37 @@ COUNT_NAMES = ("max_draws", "lost", "source", "created", "absorbed", "leak_left"
                "leak_right", "cutoff", "collisions", "elastic", "inelastic", "max_bank",
                "born_below_cutoff", "zero_yield", "free_gas")
 
+# ---- Phase 3 (response tallies) additions. With KinRunConfig.depth_bins
+# set, the kinematic kernel also fills
+#   tally[b, i, k, s, e]   i = depth bin (mcslab/depth_mesh.py); k = packed
+#                          nuclide, the last slot being the material total
+#                          summed in the kernel; s in R_*; e in EST_*.
+#                          Track-length estimators sum w l N sigma_s (cm x
+#                          1/cm x unit of s); collision estimators sum
+#                          w N sigma_s / Sigma_t at collisions.
+#   mesh_flux[b, i, e]     sum of w l (EST_TL, EST_TL_UNC) or w / Sigma_t
+#                          (EST_COLL, EST_COLL_UNC), in cm
+# Responses (mcslab/responses.py; OpenMC score names in RESPONSE_NAMES):
+R_HEATING = 0        # MT 301, eV
+R_HEATING_LOCAL = 1  # MT 901, eV
+R_DAMAGE = 2         # MT 444, eV of damage energy
+R_H3 = 3             # MT 205, tritons
+R_HE4 = 4            # MT 207, alphas
+R_ABSORPTION = 5     # absorptions (disappearance reactions)
+N_RESP = 6
+RESPONSE_NAMES = ("heating", "heating-local", "damage-energy", "H3-production",
+                  "He4-production", "absorption")
+# Estimators. *_UNC score only source neutrons before their first
+# collision: TL_UNC on their flights, COLL_UNC at that first collision
+# (OpenMC CollisionFilter bin 0 with track length, bin 1 with collision).
+EST_TL = 0
+EST_COLL = 1
+EST_TL_UNC = 2
+EST_COLL_UNC = 3
+N_EST = 4
+ESTIMATOR_NAMES = ("tracklength", "collision", "tracklength_uncollided",
+                   "collision_first")
+
 
 def allocate(n_batches, n_regions):
     region_sums = np.zeros((n_batches, N_REGION_SCORES, n_regions), dtype=np.float64)
@@ -87,6 +118,14 @@ def allocate_kin(n_batches, n_regions, n_ebins, n_channels):
     chan_zero = np.zeros((n_batches, n_channels), dtype=np.int64)
     return (region_sums, surface_sums, counts, spectrum, cutoff_weight,
             chan_events, chan_created, zero_yield_weight, chan_zero)
+
+
+def allocate_tally(n_batches, n_bins, n_nuclides):
+    """-> tally (B, n_bins, n_nuclides + 1, N_RESP, N_EST) and mesh_flux
+    (B, n_bins, N_EST), zeroed. n_bins = 0 gives empty arrays (tallies off)."""
+    tally = np.zeros((n_batches, n_bins, n_nuclides + 1, N_RESP, N_EST), dtype=np.float64)
+    mesh_flux = np.zeros((n_batches, n_bins, N_EST), dtype=np.float64)
+    return tally, mesh_flux
 
 
 def batch_stats(x):
