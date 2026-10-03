@@ -437,14 +437,27 @@ the track-length Li-7 tritium.
 
 - [x] Branch `phase-3` created from `fa5b245`.
 - [x] Plan approved (2026-10-03).
-- [ ] 1. Plan.
-- [ ] 2. Mesh, splitter, response packing.
-- [ ] 3. Kernel and driver tallies.
-- [ ] 4. Validation.
-- [ ] 5. Tally regression and D7 reference.
-- [ ] 6. Post-processing.
-- [ ] 7. Results script and figure.
-- [ ] 8. Part A docs.
+- [x] 1. Plan: `0612734`.
+- [x] 2. Mesh, splitter, response packing: `83e1893`. Check 1: worst
+      per-bin error 2.9e-16 d and sum error 2.2e-16 d (bound 1e-12).
+      Check 2: lookups bit-identical to the reader, 2.1e-16 from raw h5py.
+- [x] 3. Kernel and driver tallies: `b0f0f8c`. D7 with tallies on is
+      byte-identical to `tests/reference_kin`; Phase 1, 2a and D7
+      compares byte-exact; 172 tests pass.
+- [x] 4. Validation: `ad15aef`. All 80 statistical checks pass, largest
+      |n_SE| 2.15 (TL_UNC, W bin 2). Uncollided ratios 7.3e-14, mesh vs
+      region tallies 3.9e-14 (bounds 1e-11). The failure protocol was not
+      needed. The first overhead diagnostic compared a cold first call
+      with a warm one (+78%); it was corrected before the commit to two
+      warm calls (+37% incl. packing); the statistical results were
+      unchanged (same seed, same rows).
+- [x] 5. Tally regression and D7 reference: `d0fe4a4`. Recorded once at
+      `ad15aef` with a clean tree; 1033 KiB compressed.
+- [x] 6. Post-processing: `b028cac`.
+- [x] 7. Results script and figure: `811ca25`. D7 with tallies: 2.82 s vs
+      2.18 s without (+29%, warm, incl. packing).
+- [x] 8. Part A docs: README (results, 14.1 MeV response table, data notes,
+      Part A limitations), deviations 13-14 and the mirrored scoring path.
 - [ ] 9. Li-6 molar density.
 - [ ] 10. Reflective boundary.
 - [ ] 11. Sweep.

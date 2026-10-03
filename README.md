@@ -110,6 +110,46 @@ Phase 1 and Phase 2a kernels are unchanged.
 
 ![Neutron tracks in W | FLiBe | Fe](docs/figures/tracks.gif)
 
+### Phase 3, Part A: response tallies (heating, damage, helium, tritium)
+
+- **What is tallied.** With `KinRunConfig.depth_bins` set, the kinematic
+  kernel lays uniform depth bins over each region after the fact (no added
+  surfaces, no resampled distances; `mcslab/depth_mesh.py`). Every flight
+  segment, including those of (n,2n) secondaries, is split across the bins
+  and scores w l N_k sigma_s(E) per nuclide k and response s (track-length
+  estimator). Every collision scores w N_k sigma_s(E) / Sigma_t(E) in the
+  bin of its position (collision estimator). E is the flight energy, the
+  pre-collision energy for the collision estimator.
+- **Responses** are OpenMC v0.16.0's neutron-only scores, so Phase 4
+  compares like with like (`mcslab/responses.py`):
+  - heating, MT 301
+  - heating-local, MT 901
+  - damage-energy, MT 444
+  - H3-production, MT 205
+  - He4-production, MT 207
+  - absorption (the kernel's own disappearance set)
+
+  A nuclide without one of these MTs scores exactly 0, as in OpenMC. In
+  these data that is MT 205 of every W isotope, which is flagged in the
+  results as "no data".
+- **Also tallied:** the flux, and uncollided forms of both estimators
+  (source neutrons before their first collision), which correspond to
+  OpenMC's `CollisionFilter` bins 0 and 1. The per-layer flux spectrum is
+  the existing spectrum tally on a 20-bins-per-decade grid.
+- **Reproducibility.** The response cross sections are interpolated with
+  the grid index and factor the transport step already computed. The
+  tallies draw no random number and write only their own batch row. With
+  them on, every Phase 2b output is byte-identical.
+- **Post-processing** (`mcslab/postprocess.py`, pure Python, formulas in
+  the docstring): NRT dpa, He appm and He/dpa (W and Fe), heating in
+  W/cm^3, the heating fraction of the source energy, and tritium per
+  source neutron. Everything is scaled to a 1 MW/m^2 neutron wall loading
+  (4.4266e13 n/cm^2/s at 14.1 MeV) and one full-power year (365.25 d).
+- **Outputs:** `scripts/phase3_results.py` writes
+  `docs/phase3_results.json` and `docs/figures/phase3_profiles.png`. A
+  bit-identical regression reference per problem lives in
+  `tests/reference_tally/`.
+
 `docs/deviations_from_openmc.md` lists every known difference from OpenMC.
 
 ## Nuclear data setup
@@ -139,6 +179,8 @@ tests skip and the Phase 1 tests run as before.
 ./venv/bin/python scripts/hydrogen_cutoff.py               # H-1 cutoff fraction, target at rest vs free gas
 ./venv/bin/python scripts/record_tracks.py                 # D7 tracks -> outputs/tracks_d7.npz
 ./venv/bin/python scripts/animate_tracks.py                # -> docs/figures/tracks.gif, tracks.png
+./venv/bin/python tests/test_regression_tally.py compare   # Phase 3 response-tally bit-identical regression
+./venv/bin/python scripts/phase3_results.py                # D7 results -> docs/phase3_results.json, figure
 ```
 
 A kinematic run (Phase 2b), e.g. a synthetic scatterer:
@@ -172,6 +214,61 @@ cfg = KinRunConfig(SlabGeometry([0.0, 0.5, 20.5, 30.5], [cm.tungsten(), flibe, c
 res = run_kin(cfg)
 res.tracks.save("tracks.npz")     # then: scripts/animate_tracks.py tracks.npz
 ```
+
+## Phase 3 results on problem D7
+
+Problem D7: W 0.5 cm, then FLiBe 20 cm (natural Li, 900 K data and
+density), then Fe 10 cm, with a 14.1 MeV beam at normal incidence and
+vacuum on both sides. 20 batches x 5000 histories (seed 20261023);
+track-length estimator; mean +- SE over the 20 batches. Scaled to
+1 MW/m^2 (4.4266e13 n/cm^2/s) and one full-power year (FPY, 3.15576e7 s).
+NRT dpa uses E_d = 90 eV (W) and 40 eV (Fe) (ASTM E521). These are the
+numbers pinned by `tests/reference_tally/kin_d7`; the full set, with every
+input, is in `docs/phase3_results.json`.
+
+| quantity | W (0-0.5 cm) | FLiBe (0.5-20.5 cm) | Fe (20.5-30.5 cm) |
+|---|---|---|---|
+| NRT dpa per FPY, front bin | 0.8174 +- 0.0014 | (liquid: none) | 2.161 +- 0.010 |
+| NRT dpa per FPY, layer average | 0.8421 +- 0.0015 | | 1.224 +- 0.0073 |
+| He appm per FPY, front bin | 1.2540 +- 0.00064 | | 18.29 +- 0.16 |
+| He appm per FPY, layer average | 1.2220 +- 0.00087 | | 9.514 +- 0.068 |
+| He appm per dpa, front bin | 1.535 +- 0.0026 | | 8.464 +- 0.055 |
+| heating, front bin, W/cm^3: MT 301 to MT 901 | 0.404 to 6.25 | 2.61 to 3.06 | 0.423 to 2.79 |
+| heating, layer average, W/cm^3: MT 301 to MT 901 | 0.410 to 6.68 | 2.10 to 2.49 | 0.226 to 1.47 |
+| tritium per source neutron | 0 (no MT 205 data) | 0.2979 +- 0.0018 | 1.97e-7 +- 1.5e-9 |
+
+- **Heating SEs** are 0.2-0.8% of each value (see the JSON).
+- **Total heating / 14.1 MeV:** 0.4453 +- 0.0013 (MT 301) to
+  0.6779 +- 0.0020 (MT 901).
+- **Tritium per source neutron in FLiBe:** Li-6 0.1706 +- 0.0017,
+  Li-7 0.1174 +- 0.00038, F-19 0.007251 +- 0.000021,
+  Be-9 0.002663 +- 0.0000073.
+
+![Depth profiles in problem D7](docs/figures/phase3_profiles.png)
+
+How to read these numbers:
+
+- **Heating is a bracket, not a number.** MT 301 leaves out the energy
+  carried off by gammas. With no photon transport, that energy is simply
+  missing, so MT 301 is a lower bound. MT 901 deposits the gamma energy
+  where the gamma is born, which is right in total only if no gamma
+  escapes, and too local because gammas travel centimetres. The deposited
+  heating lies between the two.
+  - In W and Fe the gap is large: gammas carry most of the energy.
+  - **W heating should not be quoted as one number.** On top of the gap,
+    W's MT 301 varies irregularly between the isotopes at 14.1 MeV, from
+    3.9e5 eV-b (W183) to 9.4e5 eV-b (W184), while MT 901 varies by about 25%.
+- **"Front bin" means the plasma side of a layer**, not the maximum. In W,
+  the back of the layer sees more flux, from neutrons reflected by the
+  FLiBe, so its dpa rises to 0.85 per FPY in the last bin.
+- **Fe is damaged more than W even behind 20 cm of FLiBe.** At 14.1 MeV
+  its damage energy cross section is about 2.7 times W's, its E_d is lower
+  (40 vs 90 eV), and the flux reaching it is higher (3.06 vs 2.14 per
+  source neutron per cm^2, front bins).
+- **The tritium number is not a tritium breeding ratio.** D7 has vacuum on
+  the plasma side, and 56% of the source leaks back out of it. In a torus
+  those neutrons would enter another blanket. Part B adds a reflective
+  plasma side.
 
 ## Tests: what they do and do not cover
 
@@ -317,6 +414,43 @@ res.tracks.save("tracks.npz")     # then: scripts/animate_tracks.py tracks.npz
   bit-identical under repeated, split and reordered batch runs with
   secondaries present. Bank overflow raises instead of dropping neutrons.
 
+Phase 3 (seeds, thresholds and bins fixed in `docs/phase3_plan.md` before
+the tests were written):
+
+- `tests/test_tally_mesh.py` (deterministic):
+  - **Splitting.** 1e5 random segments against exact rational arithmetic:
+    per-bin lengths within 2.9e-16 d and sums within 2.2e-16 d (bound
+    1e-12). Segments that end on a layer boundary end in its last bin.
+  - **Response lookups:** bit-identical to the reader's for all 13 D7
+    nuclides, and within 2.1e-16 of the raw HDF5 values.
+- `tests/test_tally_reproducibility.py`:
+  - D7 with the tallies on reproduces all 9 Phase 2b reference arrays
+    byte for byte.
+  - The tally arrays are byte-identical for split, chunked and reversed
+    batch ranges, stale output rows, track recording on or off, and a
+    fresh process with an empty Numba cache.
+- `tests/test_tally_physics.py`: one D7 validation run (100 x 2000).
+  - **First flight.** The uncollided track length in each of the 50 bins
+    (50 checks) and the first-collision estimator per layer (3) are
+    checked against (exp(-tau_a) - exp(-tau_b)) / Sigma_t, computed from
+    the raw HDF5 files.
+  - **Uncollided ratios:** uncollided response / flux equals the raw
+    N sigma(14.1 MeV) to 7.3e-14.
+  - **Track length vs collision estimator:** per layer for every response,
+    and for FLiBe tritium per nuclide (24 checks).
+  - **Track-length absorption vs analog absorptions** per layer (3
+    checks). The analog side counts only histories ended by a sampled
+    absorption; zero-yield and cutoff kills are excluded.
+  - **Exact:** W tritium is 0, and the summed mesh tallies equal the
+    region tallies to 3.9e-14.
+  - **Result:** all 80 statistical checks pass, largest |n_SE| 2.15.
+  - **What this does not show:** that the response *data* are right, or
+    that mcslab agrees with OpenMC (Phase 4).
+- `tests/test_regression_tally.py`: byte-exact references, one per problem.
+  The D7 transport arrays must hash as in `tests/reference_kin`.
+- `tests/test_postprocess.py`: every post-processing formula, checked
+  against a hand computation.
+
 ## Hand-checking cross sections against an independent source
 
 These are values at 14.1 MeV from mcslab (ENDF/B-VIII.0, 294 K, lin-lin on
@@ -350,6 +484,45 @@ Steps:
 
 The exact menu names in these web tools may differ from the description
 above.
+
+### Response cross sections used by the Phase 3 tallies (14.1 MeV)
+
+Values at the D7 data temperatures: W and Fe at 294 K, Li, Be and F at
+900 K. Lin-lin on the NJOY grid.
+
+| nuclide | 301 heating (eV-b) | 901 heating-local (eV-b) | 444 damage (eV-b) | 205 (n,Xt) (b) | 207 (n,Xa) (b) |
+|---|---|---|---|---|---|
+| W180 | 644991 | 9.13656e6 | 94559.3 | no data | 0.00231004 |
+| W182 | 621866 | 1.01257e7 | 97064.4 | no data | 0.00137327 |
+| W183 | 388748 | 1.13464e7 | 99850.5 | no data | 0.00135283 |
+| W184 | 944698 | 9.62028e6 | 96310.7 | no data | 0.000658936 |
+| W186 | 724359 | 9.42129e6 | 95915.4 | no data | 0.00044794 |
+| Li6 | 4.86361e6 | 4.86942e6 | 12518.9 | 0.0258 | 0.577686 |
+| Li7 | 3.33950e6 | 3.37124e6 | 13319.2 | 0.300646 | 0.320906 |
+| Be9 | 2.91306e6 | 2.91671e6 | 19293.5 | 0.0208775 | 0.979366 |
+| F19 | 3.56030e6 | 4.35250e6 | 97140.2 | 0.01303 | 0.410193 |
+| Fe54 | 5.22357e6 | 1.15040e7 | 263040 | 4.07258e-9 | 0.0884604 |
+| Fe56 | 1.75887e6 | 9.54478e6 | 257756 | 2.61359e-7 | 0.0436698 |
+| Fe57 | 1.22002e6 | 5.65010e6 | 177274 | 1.04802e-4 | 0.0296651 |
+| Fe58 | 904268 | 5.34999e6 | 258634 | 1.80315e-7 | 0.0217647 |
+
+Dividing an eV-b value by sigma_t gives eV per collision.
+
+- **Checkable against an ENDF evaluation:**
+  - Li-6 MT 205 equals its (n,t) MT 105 exactly.
+  - Li-7 MT 205 equals the sum of MT 52-82 (to 4.8e-8 b), as in the table
+    above.
+- **Not checkable against an evaluation.** MT 301, 444 and 901 are not
+  evaluated data: NJOY's HEATR derived them, and GASPR derived MT 203-207,
+  when the library was processed. An independent check needs another
+  processing, for example JANIS with an ENDF/B-VIII.0 ACE library. **This
+  has not been done.**
+- **Data notes, reported and not adjusted:**
+  - W-186's MT 444 is zero below 3997.71 eV, while the other W isotopes
+    have nonzero damage energy from capture recoil at thermal energies.
+  - The W isotopes have no MT 205 at all.
+  - No 301, 901 or 444 value is negative, and 901 >= 301 at every grid
+    point.
 
 ## Limitations
 
@@ -390,7 +563,7 @@ above.
   check. The evaluated total cross section is compared with an independent
   source only through the manual hand-check above, which has not yet been
   done.
-- **Tritium, heating and damage** data are inventoried but not yet tallied.
+- **(Tallied in Phase 3.) Tritium, heating and damage** data are inventoried but not yet tallied.
   For Li-7, tritium production is only available as the redundant MT 205
   (see `docs/data_inventory.md`).
 - **FENDL-3.2** is supported by the reader in principle, but it has not been
@@ -460,4 +633,37 @@ above.
   in a large non-absorbing medium could scatter for a very long time.
 - **Photons are ignored**, including photon products of every reaction.
   So are the charged particles and recoils of (n,n'alpha)t and the like:
-  tritium and gas production are not tallied yet (Phase 3).
+  tritium and gas production are not tallied yet (Phase 3; now tallied as
+  expected values from the MT 205 / 207 data, but the charged particles
+  are still not transported).
+
+### Phase 3, Part A
+- **No photon transport.** MT 301 (gamma energy lost) and MT 901 (gamma
+  energy deposited locally) bracket the deposited heating. Neither is the
+  answer, and in D7 the bracket is a factor of 16 (W) and 6.5 (Fe) wide.
+  W heating in particular should be quoted as the bracket: its MT 301
+  varies irregularly between the isotopes (3.9e5 to 9.4e5 eV-b at
+  14.1 MeV).
+- **1D slab, beam at normal incidence.** Real plasma neutrons arrive at
+  all angles, which raises near-surface rates at the same wall loading.
+  D7 leaks 56% of its source back out of the plasma side, so its tritium
+  number is not a breeding ratio.
+- **NRT dpa:**
+  - It is applied to the energy-integrated damage energy, so NRT's
+    low-energy steps are not modelled, and there is no arc-dpa
+    correction.
+  - The E_d values (90 eV for W, 40 eV for Fe, ASTM E521) are a choice,
+    and dpa scales as 1/E_d.
+  - The E_d that NJOY used inside MT 444 is not recorded in the data
+    files.
+  - W-186's MT 444 starts at 4 keV in the data.
+- **Expected-value scoring.** Tritium, helium, heating and damage are
+  expected values from the processed response data. No triton, alpha or
+  recoil is transported, and no damage cascade is simulated.
+- **No URR probability tables** (as before); they would change Fe-58 and W
+  self-shielding in the keV-MeV range.
+- **Statistics.** README standard errors come from 20 batches. The
+  validation tests use 100.
+- **Not yet validated against OpenMC or experiment** (Phase 4). The tests
+  show that the tallies score the data consistently and reproducibly, not
+  that the data or the transport are right.

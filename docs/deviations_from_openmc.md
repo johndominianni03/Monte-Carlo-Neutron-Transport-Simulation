@@ -8,8 +8,9 @@ The reference is **OpenMC v0.16.0** (tag `v0.16.0`, released 2026-08-05),
 read from source. File paths are relative to the OpenMC repository. The
 `openmc` package itself is never installed or imported.
 
-Status: Phase 2b Part 2. Every secondary law in the W / FLiBe / Fe data is
-implemented, plus free-gas target motion and per-material temperature.
+Status: Phase 3. Every secondary law in the W / FLiBe / Fe data is
+implemented, plus free-gas target motion, per-material temperature and
+the response tallies (heating, damage, gas production).
 
 ## What is mirrored (for orientation)
 
@@ -82,6 +83,36 @@ These follow OpenMC's algorithm and random-number order:
 - **Temperature for the 2a driver:** the Phase 2a driver (first-collision
   kernel) keeps one temperature, "294K", and refuses materials that would
   select other data.
+- **Response tallies (Phase 3).** Each tally equals an OpenMC score in a
+  neutron-only run (`src/reaction.cpp` `REACTION_TYPE_MAP`;
+  `src/tallies/tally_scoring.cpp`):
+  - heating = MT 301 through `score_neutron_heating` /
+    `get_nuclide_neutron_heating`, with no keff reweighting in fixed-source
+    mode
+  - heating-local (901), damage-energy (444), H3-production (205) and
+    He4-production (207) through the `default:` case of
+    `score_general_ce_nonanalog` and `get_nuclide_xs`, which returns 0 for
+    a nuclide without the reaction (MT 205 of every W isotope here)
+  - absorption: the disappearance set, identical to OpenMC's
+- **Estimators.**
+  - Track length: flux `w l` (`score_tracklength_tally`), the default
+    estimator for all of these scores without photon transport
+    (`include/openmc/tallies/tally.h`, `Tally::set_scores`).
+  - Collision: flux `w / Sigma_t` with the pre-collision cross sections
+    (`score_collision_tally`, called after `collision()`).
+  - Both interpolate the response with the grid index and factor of the
+    flight energy, shared with the total (`Reaction::xs`,
+    `Nuclide::calculate_xs`).
+- **Depth mesh.** A track is split across mesh bins (as `MeshFilter` with
+  `bins_crossed` / `raytrace_mesh`, `src/mesh.cpp`), and a collision is
+  binned by its position (`get_bin`). The Phase 4 equivalent of the depth
+  mesh is a RectilinearMesh with the same x edges.
+- **Uncollided estimators.** mcslab's uncollided track-length estimator
+  equals OpenMC's `CollisionFilter` bin 0 with a track-length estimator.
+  Its first-collision estimator equals bin 1 with a collision estimator.
+  This is because secondaries inherit `n_collision` (`src/particle.cpp`),
+  and `collision()` increments it before the collision tally
+  (`src/physics.cpp`).
 
 ## Deviations
 
@@ -279,3 +310,32 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
   default FLiBe pairs the 973 K density with 294 K data, as before.
 - **Effect:** none at the default settings. A material temperature more
   than 10 K from a data temperature is refused, as in OpenMC.
+
+### 13. Interpolation formula (round-off only)
+
+- **OpenMC** (`src/reaction.cpp`, `Reaction::xs`; `src/nuclide.cpp`,
+  `Nuclide::calculate_xs`): `(1 - f) x[i] + f x[i+1]`.
+- **mcslab** (`mcslab/xs.py`, `interp_at` / `interp_xs`):
+  `x[i] + f (x[i+1] - x[i])`, with the same `i` and `f`.
+- **Why:** the two are equal in exact arithmetic, and mcslab's form returns
+  stored values bit for bit at grid energies (Phase 2a test a). This has
+  applied to every lookup since Phase 2a and is listed now that response
+  tallies use it too.
+- **Effect:** about one ulp per lookup; no statistical effect.
+
+### 14. Track splitting across depth bins (round-off only)
+
+- **OpenMC** (`StructuredMesh::raytrace_mesh`) scores each bin with a
+  *fraction* of the track length. It nudges positions by `TINY_BIT` to
+  find cells, and a track shorter than `2 TINY_BIT` scores its whole
+  length to the cell it starts in.
+- **mcslab** (`mcslab/depth_mesh.py`, `segment_pieces`) computes each
+  bin's length directly from the edge distances `(e_k - x0) / u`. These use
+  the same formula as the region boundary, so the pieces telescope to the
+  flight length and a boundary segment ends exactly on the layer edge. An
+  edge belongs to the bin being entered. There are no nudges and no
+  minimum length.
+- **Effect:** per-bin lengths agree to round-off (tests/test_tally_mesh.py:
+  2.9e-16 of the flight length against exact arithmetic). Tracks shorter
+  than about 2e-8 cm may be attributed differently; that has no
+  statistical effect.
