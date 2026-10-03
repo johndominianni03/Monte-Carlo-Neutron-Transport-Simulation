@@ -25,6 +25,7 @@ the cross-section evaluation.
 """
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
@@ -65,11 +66,19 @@ class CEMaterial:
     scattering. None means the run's default (293.6 K). It does not change
     the density: set that explicitly (e.g. flibe(temperature_K=...)). The
     Phase 2a driver refuses a material whose temperature selects data other
-    than the run's single temperature."""
+    than the run's single temperature.
+
+    reference_atom_fractions: None (the default) means density_g_cm3 is the
+    mass density of this composition. Otherwise density_g_cm3 is the mass
+    density of the *reference* composition, and the total atom density of
+    the reference is held: an isotopic variant (e.g. enriched lithium) has
+    the same atoms per cm^3 as the reference, and its own mass density is
+    mass_density(awr). Its nuclides must be among this material's."""
     name: str
     density_g_cm3: float
     atom_fractions: Tuple[Tuple[str, float], ...]
     temperature: Optional[float] = None
+    reference_atom_fractions: Optional[Tuple[Tuple[str, float], ...]] = None
 
     def __post_init__(self):
         if self.density_g_cm3 < 0.0:
@@ -82,6 +91,13 @@ class CEMaterial:
         names = [n for n, _ in self.atom_fractions]
         if len(set(names)) != len(names):
             raise ValueError(f"{self.name}: repeated nuclide")
+        ref = self.reference_atom_fractions
+        if ref is not None:
+            if abs(sum(f for _, f in ref) - 1.0) > 1e-12:
+                raise ValueError(f"{self.name}: reference fractions do not sum to 1")
+            if not {n for n, _ in ref} <= set(names):
+                raise ValueError(f"{self.name}: reference nuclides must be among the "
+                                 "material's")
 
     @property
     def nuclide_names(self) -> Tuple[str, ...]:
@@ -93,12 +109,26 @@ class CEMaterial:
         mean atomic mass  M = sum_i f_i AWR_i m_n            (g/mol)
         atom density      N = rho N_A / M                    (1/cm^3)
         N_i = f_i N x 1e-24                                  (1/(barn cm))
+
+        With reference_atom_fractions, M is the reference composition's
+        mean mass, so N is the reference's atom density.
         """
         if not self.atom_fractions:
             return ()
-        mean_mass = sum(f * awr[n] * NEUTRON_MASS_U for n, f in self.atom_fractions)
+        ref = self.atom_fractions if self.reference_atom_fractions is None \
+            else self.reference_atom_fractions
+        mean_mass = sum(f * awr[n] * NEUTRON_MASS_U for n, f in ref)
         n_total = self.density_g_cm3 * N_AVOGADRO / mean_mass * BARN_CM2
         return tuple((n, f * n_total) for n, f in self.atom_fractions)
+
+    def mass_density(self, awr: Dict[str, float]) -> float:
+        """Mass density (g/cm^3) of this composition: density_g_cm3, scaled
+        by M(this) / M(reference) when a reference composition is held."""
+        if self.reference_atom_fractions is None:
+            return self.density_g_cm3
+        m_self = sum(f * awr[n] for n, f in self.atom_fractions)
+        m_ref = sum(f * awr[n] for n, f in self.reference_atom_fractions)
+        return self.density_g_cm3 * m_self / m_ref
 
 
 VOID_CE = CEMaterial("void", 0.0, ())
@@ -143,10 +173,22 @@ def flibe(li6_fraction: Optional[float] = None,
                   lithium (0.0759) [IUPAC].
     temperature_K: sets only the density (Janz correlation [JANZ]). The cross
                   sections stay at the temperature of the nuclear data (294 K).
+
+    Density of enriched FLiBe (approved D18): the Janz density is taken to
+    be that of natural-Li FLiBe, and an enriched salt keeps its molar
+    density (formula units, hence atoms, per cm^3), since swapping lithium
+    isotopes barely changes the molar volume. Only the Li isotopic split
+    changes; the mass density falls with the lighter Li-6 (about -1.7% at
+    90% Li-6; see CEMaterial.mass_density). li6_fraction=None takes the
+    natural-Li path unchanged.
     """
     if li6_fraction is not None and not 0.0 <= li6_fraction <= 1.0:
         raise ValueError("li6_fraction must be in [0, 1]")
-    li = element("Li") if li6_fraction is None else element(
-        "Li", {"Li6": li6_fraction, "Li7": 1.0 - li6_fraction})
-    return _compound("FLiBe", flibe_density(temperature_K),
-                     ((2, li), (1, element("Be")), (4, element("F"))))
+    natural = ((2, element("Li")), (1, element("Be")), (4, element("F")))
+    if li6_fraction is None:
+        return _compound("FLiBe", flibe_density(temperature_K), natural)
+    li = element("Li", {"Li6": li6_fraction, "Li7": 1.0 - li6_fraction})
+    mat = _compound("FLiBe", flibe_density(temperature_K),
+                    ((2, li), (1, element("Be")), (4, element("F"))))
+    ref = _compound("FLiBe", flibe_density(temperature_K), natural)
+    return dataclasses.replace(mat, reference_atom_fractions=ref.atom_fractions)
