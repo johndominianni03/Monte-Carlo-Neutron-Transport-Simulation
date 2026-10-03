@@ -458,7 +458,81 @@ the track-length Li-7 tritium.
       2.18 s without (+29%, warm, incl. packing).
 - [x] 8. Part A docs: README (results, 14.1 MeV response table, data notes,
       Part A limitations), deviations 13-14 and the mirrored scoring path.
-- [ ] 9. Li-6 molar density.
-- [ ] 10. Reflective boundary.
-- [ ] 11. Sweep.
-- [ ] 12. Part B docs.
+- [x] 9. Li-6 molar density: `d4e5fc8`. Natural path unchanged bit for
+      bit; all regressions byte-exact.
+- [x] 10. Reflective boundary: `2e367d7`. Folding test (4 checks): flux
+      +0.33, absorption +2.53, leakage -2.51, tritium +0.08 SE, all within
+      3 SE (absorption and leakage are nearly one fluctuation, their sum
+      being fixed by the balance). `kin_d7_reflect` recorded once in its
+      own file (1050 KiB); `kin_d7` untouched (record refuses an existing
+      reference). Its manifest shows `git_dirty` true at `d4e5fc8`: the
+      uncommitted changes were exactly those committed with it. 194 tests
+      pass.
+- [x] 11. Sweep: `e28d744`. About 100 s; the CSV reproduces byte for byte.
+      Reflective D7 results added to `docs/phase3_results.json`.
+- [x] 12. Part B docs: README (Part B scope, reflective D7 table, sweep
+      table and figure, tests, limitations), deviation 15, this status.
+
+## Final summary (2026-10-03)
+
+- **Tests:** 194 pass (161 before Phase 3, 33 new: 5 mesh, 6
+  reproducibility, 7 physics, 1 tally regression, 3 post-processing, 11
+  blanket). Regressions: Phase 1, Phase 2a, D7 (`tests/reference_kin`)
+  and both tally problems byte-exact.
+- **Statistical checks:** 84 new, all pass (80 in Part A, largest |n_SE|
+  2.15; 4 in Part B, largest 2.53). The suite's largest value overall is
+  still the earlier free-gas chi-square (p = 0.007, accepted at
+  p >= 0.0027). The failure protocol (seed 20261039) was never needed.
+- **Round-off bounds** (fixed before the tests, none exceeded): splitting
+  2.9e-16 d (1e-12); lookups 2.1e-16 (1e-12); uncollided ratios 7.3e-14
+  (1e-11); mesh vs region tallies 3.9e-14 (1e-11).
+- **Tally overhead,** wall clock including about 1.5-2 s of packing per
+  run: D7 2.82 s vs 2.18 s (+29%); the 2e5-history validation run +37%;
+  reflective D7 +38%.
+- **D7 headline** (20 x 5000, seed 20261023): tritium 0.2979 +- 0.0018 per
+  source neutron (Li-6 0.1706, Li-7 0.1174, F-19 0.00725, Be-9 0.00266);
+  front-bin NRT dpa per FPY 0.8174 +- 0.0014 (W), 2.161 +- 0.010 (Fe);
+  front-bin He appm per FPY 1.2540 +- 0.0006 (W), 18.29 +- 0.16 (Fe);
+  heating fraction of 14.1 MeV 0.4453 +- 0.0013 (301) to 0.6779 +- 0.0020
+  (901).
+- **Part B headline:** smallest FLiBe thickness on the grid with tritium
+  per source above 1: 50 cm (natural, 20%, 90% Li-6); 30 cm (40%, 60%),
+  but only 1.5 and 0.9 SE above 1.
+- **Judgment calls:**
+  - W MT 205 absent: scored 0, as OpenMC does, and flagged as "no data"
+    (D9).
+  - Collision estimator binned by position (D11).
+  - "Front bin" is the plasma-side bin, not the maximum. In W the back bin
+    is higher (0.85 vs 0.82 dpa per FPY).
+  - The validation run uses 100 batches; the README numbers come from
+    D7's 20 (D14).
+  - The overhead diagnostic first compared a cold call with a warm one; it
+    was corrected to two warm calls before commit 4, with the statistical
+    rows unchanged.
+  - The reproducibility test keeps the planned 12 x 200 problem, though
+    re-packing on each of its 12 single-batch calls makes it slow (about
+    29 s). The driver's packing cost was not optimised.
+  - Absent responses are packed with threshold index = grid size, so they
+    are never read.
+  - Region atom density = sum of the packed nuclide densities (for dpa and
+    appm). He/dpa SE uses the ratio estimator.
+  - The kin_d7 tally reference cross-checks 8 transport arrays against
+    `tests/reference_kin`; the spectrum is excluded because its grid
+    differs.
+  - kin_d7_reflect pins all its transport arrays (no other reference
+    covers reflection).
+  - `record` refuses to overwrite an existing reference without
+    `--overwrite`.
+  - kin_d7_reflect was recorded with this commit's changes uncommitted
+    (`git_dirty` true), to keep the 12-commit structure.
+  - The reflective D7 problem uses seed 20261035, as the seeds table
+    fixes. It therefore shares its histories with the sweep's 20 cm
+    natural point, and its tritium value is identical.
+  - Natural-Li sweep points use the natural path (`li6_fraction=None`).
+  - "First above 1" in the sweep is judged by the mean, with the SE
+    margin stated.
+  - The sweep figure uses an ordinal single-hue ramp (enrichment is a
+    magnitude) with markers and a legend; the end labels were dropped
+    because they collided.
+  - The JSON and CSV outputs exclude timings, so they are reproducible.
+

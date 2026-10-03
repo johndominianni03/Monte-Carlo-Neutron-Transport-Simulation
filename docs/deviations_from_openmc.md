@@ -339,3 +339,21 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
   2.9e-16 of the flight length against exact arithmetic). Tracks shorter
   than about 2e-8 cm may be attributed differently; that has no
   statistical effect.
+
+### 15. Reflective boundary (Phase 3 Part B; round-off and bookkeeping only)
+
+- **OpenMC** (`src/boundary_condition.cpp`, `ReflectiveBC::handle_particle`;
+  `src/particle.cpp`, `Particle::cross_reflective_bc`):
+  - reflects the direction with `Surface::reflect`, then renormalises it
+    (`u /= u.norm()`)
+  - scores surface tallies at the reflection
+  - supports an albedo
+- **mcslab** (`reflect_left`, approved D17):
+  - flips the sign of `u` exactly, which leaves the norm unchanged
+  - does not count a reflection as a surface crossing: `surface_sums` is
+    untouched, so the exact balance holds with no left leakage, and the
+    weight is tallied in `reflected_weight`
+  - reflects on the left (plasma) side only, with albedo 1; draws no
+    random number
+- **Effect:** none on volume tallies. A surface-current comparison at a
+  reflective surface must count reflections the same way in both codes.

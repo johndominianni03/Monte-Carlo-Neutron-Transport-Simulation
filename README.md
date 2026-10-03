@@ -150,6 +150,25 @@ Phase 1 and Phase 2a kernels are unchanged.
   bit-identical regression reference per problem lives in
   `tests/reference_tally/`.
 
+### Phase 3, Part B: blanket study
+
+- **Li-6 enrichment.** `ce_materials.flibe(li6_fraction=x)` holds the
+  molar density of natural-Li FLiBe at the Janz density, because swapping
+  lithium isotopes barely changes the molar volume. Only the Li isotopic
+  split changes, and the mass density falls with the lighter Li-6 (-1.7%
+  at 90%; `CEMaterial.mass_density`). Natural Li (`li6_fraction=None`)
+  takes the unchanged path.
+- **Reflective plasma side.** `KinRunConfig.reflect_left` (default
+  `False`, vacuum) reflects a neutron at x = 0 specularly. It flips u,
+  draws no random number, and is not a leak: the weight goes to
+  `reflected_weight`, and the balance stays exact. In D7, 56% of the
+  source leaks back out of the plasma side; in a torus those neutrons
+  would enter another blanket. A reflective plane is the idealised
+  version of that return.
+- **Sweep.** `scripts/blanket_sweep.py` maps tritium per source neutron
+  over FLiBe thickness x Li-6 enrichment with the reflective plasma side
+  (`docs/blanket_sweep.csv`, `docs/figures/blanket_sweep.png`).
+
 `docs/deviations_from_openmc.md` lists every known difference from OpenMC.
 
 ## Nuclear data setup
@@ -181,6 +200,7 @@ tests skip and the Phase 1 tests run as before.
 ./venv/bin/python scripts/animate_tracks.py                # -> docs/figures/tracks.gif, tracks.png
 ./venv/bin/python tests/test_regression_tally.py compare   # Phase 3 response-tally bit-identical regression
 ./venv/bin/python scripts/phase3_results.py                # D7 results -> docs/phase3_results.json, figure
+./venv/bin/python scripts/blanket_sweep.py                 # Part B sweep -> docs/blanket_sweep.csv, figure (~2 min)
 ```
 
 A kinematic run (Phase 2b), e.g. a synthetic scatterer:
@@ -269,6 +289,69 @@ How to read these numbers:
   the plasma side, and 56% of the source leaks back out of it. In a torus
   those neutrons would enter another blanket. Part B adds a reflective
   plasma side.
+
+## Phase 3 Part B results: reflective plasma side and blanket sweep
+
+**D7 with a reflective plasma side** (`tests/reference_tally/kin_d7_reflect`):
+the same slab, the same scaling and E_d, seed 20261035, 20 x 5000.
+
+| quantity | W (0-0.5 cm) | FLiBe (0.5-20.5 cm) | Fe (20.5-30.5 cm) |
+|---|---|---|---|
+| NRT dpa per FPY, front bin | 1.317 +- 0.0071 | (liquid: none) | 2.297 +- 0.014 |
+| NRT dpa per FPY, layer average | 1.297 +- 0.0056 | | 1.291 +- 0.0061 |
+| He appm per FPY, front bin | 1.273 +- 0.0019 | | 18.38 +- 0.14 |
+| He appm per FPY, layer average | 1.235 +- 0.0011 | | 9.547 +- 0.051 |
+| He appm per dpa, front bin | 0.9667 +- 0.0048 | | 8.00 +- 0.042 |
+| heating, front bin, W/cm^3: MT 301 to MT 901 | 0.539 to 14.2 | 3.93 to 4.58 | 0.434 to 3.05 |
+| heating, layer average, W/cm^3: MT 301 to MT 901 | 0.532 to 15.0 | 2.93 to 3.39 | 0.231 to 1.61 |
+| tritium per source neutron | 0 (no MT 205 data) | 0.6819 +- 0.0027 | 1.96e-7 +- 1.1e-9 |
+
+- **Tritium per source neutron in FLiBe:** Li-6 0.5469 +- 0.0029, Li-7
+  0.1250 +- 0.00032, F-19 0.007294, Be-9 0.002659.
+- **Total heating / 14.1 MeV:** 0.6116 +- 0.0011 (301) to
+  0.9131 +- 0.0013 (901).
+- **What the returning neutrons do:**
+  - Li-6 tritium more than triples.
+  - W dpa rises by 54-61% (layer average and front bin), and W's
+    local-photon heating more than doubles, from slow neutrons captured in
+    W.
+  - Fe, behind 20 cm of FLiBe, changes by less than 10%.
+
+**Sweep.** The setup:
+- W 0.5 cm | FLiBe L | Fe 10 cm, with a reflective plasma side.
+- FLiBe at 900 K data and density.
+- 20 x 5000 histories per point.
+- **All 30 points share one seed (20261035)**, so the curves are
+  correlated with each other.
+
+This is an **idealised 1D upper bound**: a reflective plane returns every
+neutron that leaves the plasma side, and there is no structure, coolant,
+ports or gaps. It is not the breeding ratio of a real design.
+
+Tritium per source neutron (mean +- SE):
+
+| FLiBe L (cm) | 7.59% Li-6 (natural) | 20% Li-6 | 40% Li-6 | 60% Li-6 | 90% Li-6 |
+|---|---|---|---|---|---|
+| 10 | 0.3410 +- 0.0015 | 0.4220 +- 0.0018 | 0.4842 +- 0.0023 | 0.5141 +- 0.0029 | 0.5343 +- 0.0031 |
+| 20 | 0.6819 +- 0.0027 | 0.7632 +- 0.0033 | 0.8074 +- 0.0026 | 0.8195 +- 0.0039 | 0.8172 +- 0.0028 |
+| 30 | 0.9188 +- 0.0029 | 0.9822 +- 0.0042 | 1.0034 +- 0.0023 | 1.0037 +- 0.0041 | 0.9820 +- 0.0036 |
+| 50 | 1.1495 +- 0.0039 | 1.1802 +- 0.0029 | 1.1806 +- 0.0035 | 1.1590 +- 0.0039 | 1.1196 +- 0.0038 |
+| 75 | 1.2170 +- 0.0033 | 1.2342 +- 0.0031 | 1.2264 +- 0.0036 | 1.1996 +- 0.0037 | 1.1543 +- 0.0035 |
+| 100 | 1.2282 +- 0.0034 | 1.2417 +- 0.0031 | 1.2331 +- 0.0037 | 1.2053 +- 0.0039 | 1.1597 +- 0.0035 |
+
+![Tritium per source neutron vs FLiBe thickness and Li-6 enrichment](docs/figures/blanket_sweep.png)
+
+- **Smallest thickness on this grid with tritium per source above 1:**
+  - 50 cm for natural, 20% and 90% Li-6.
+  - 30 cm for 40% and 60%, but only by 1.5 and 0.9 SE: not
+    distinguishable from 1 at this precision.
+- **Enrichment helps thin blankets and hurts thick ones.** At 10-30 cm,
+  more Li-6 captures more slow neutrons. At 75-100 cm, 90% Li-6 gives the
+  least tritium: with less Li-7 there is less fast Li-7(n,n't) tritium,
+  and that reaction also returns a neutron.
+- **The plateau** is about 1.23 per source neutron for natural to 40%
+  Li-6. A real blanket loses neutrons to structure, ports and gaps, so it
+  would breed less.
 
 ## Tests: what they do and do not cover
 
@@ -450,6 +533,23 @@ the tests were written):
   The D7 transport arrays must hash as in `tests/reference_kin`.
 - `tests/test_postprocess.py`: every post-processing formula, checked
   against a hand computation.
+- `tests/test_blanket.py` (Part B):
+  - **Enrichment:** the natural-Li path is unchanged bit for bit; enriched
+    FLiBe keeps the Be and F densities exactly and the total atom density
+    to 1e-14.
+  - **Reflection, exact:** in a void slab, the reflection draws no random
+    number, its count equals the replayed number of backward source
+    directions, and the track length equals the replayed paths to 1e-12.
+    On W | FLiBe | Fe, every reflection flips u bit for bit at x = 0 with
+    E unchanged, and the balance is exact with no left leakage.
+  - **Reflection, statistical:** a reflective [0, 20] cm FLiBe slab equals
+    the mirrored vacuum [-20, 20] cm slab in flux, absorption, leakage and
+    tritium (4 checks).
+    - Largest deviation: 2.53 SE (absorption), with leakage at -2.51 SE.
+    - These two are nearly one fluctuation, because their sum is fixed by
+      the neutron balance.
+  - **Not covered:** an albedo below 1, a reflective right side, and any
+    comparison of the sweep with another code.
 
 ## Hand-checking cross sections against an independent source
 
@@ -667,3 +767,18 @@ Dividing an eV-b value by sigma_t gives eV per collision.
 - **Not yet validated against OpenMC or experiment** (Phase 4). The tests
   show that the tallies score the data consistently and reproducibly, not
   that the data or the transport are right.
+
+### Phase 3, Part B
+- **The reflective plane is an idealisation.** It returns every neutron
+  that leaves the plasma side, with its energy unchanged and its direction
+  mirrored. A real torus returns fewer neutrons, with a softened spectrum
+  and a different angular distribution. Results with it are upper bounds
+  for tritium and overestimates of the low-energy return to the first
+  wall.
+- **The sweep is 1D:** no structure, coolant, ports, gaps or
+  multiplier/breeder separation; it is not a TBR of any design. All points
+  share one seed, so the curves are correlated: differences between
+  neighbouring points are smoother than their SEs suggest.
+- **Enriched FLiBe density:** the molar density is held at the natural-Li
+  Janz value. That is an assumption; no density data for enriched FLiBe
+  were used.
