@@ -2,11 +2,12 @@
 """Phase 4 comparison of mcslab and OpenMC 0.16.0 (docs/phase4_plan.md).
 
 Applies the pre-declared checks to the committed result pairs in
-benchmark/results/. Needs numpy only; it
+benchmark/results/. Needs numpy only (matplotlib only with --figures); it
 imports neither openmc, mcslab nor h5py, so the comparison is reproducible
 without OpenMC installed.
 
     ./venv/bin/python benchmark/compare.py            # tables, results/comparison.json
+    ./venv/bin/python benchmark/compare.py --figures  # also docs/figures/phase4_*.png
 
 Rules (fixed before any benchmark run):
 - z = (mcslab - OpenMC) / sqrt(SE_m^2 + SE_o^2), means and SEs over 100
@@ -486,6 +487,236 @@ def compare_all():
     }
 
 
+# ---------------------------------------------------------------- figures
+# Reference data-viz palette (light surface), as the Phase 3 figures:
+# categorical slots 1 and 2 for the two codes, ink for references.
+SURFACE, INK, INK2, GRID, BAND = "#fcfcfb", "#0b0b0b", "#52514e", "#e5e4e0", "#f0efec"
+SERIES = ("#2a78d6", "#eb6834")
+FIG_DIR = os.path.join(REPO, "docs", "figures")
+RATIO_PANELS = (("flux", "flux"),) + tuple((s, SCORE_LABEL[s]) for s in SCORES)
+
+
+def _style(ax):
+    ax.set_facecolor(SURFACE)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(INK2)
+    ax.tick_params(colors=INK2, labelsize=8)
+    ax.grid(True, axis="y", color=GRID, lw=0.8)
+    ax.set_axisbelow(True)
+
+
+def _layer_bands(ax, spec, x_of_layer):
+    for i, (layer, (x0, x1)) in enumerate(zip(spec["layers"], x_of_layer)):
+        if i % 2 == 0:
+            ax.axvspan(x0, x1, color=BAND, zorder=0, lw=0)
+        ax.text(0.5 * (x0 + x1), 0.97, layer["name"], transform=ax.get_xaxis_transform(),
+                ha="center", va="top", color=INK2, fontsize=7.5, zorder=4)
+
+
+def _ratio(m, sm, o, so):
+    m, sm, o, so = (np.asarray(v, dtype=np.float64) for v in (m, sm, o, so))
+    ok = (m != 0.0) & (o != 0.0)
+    r = np.full_like(m, np.nan)
+    e = np.full_like(m, np.nan)
+    r[ok] = m[ok] / o[ok]
+    e[ok] = r[ok] * np.sqrt((sm[ok] / m[ok]) ** 2 + (so[ok] / o[ok]) ** 2)
+    return r, e
+
+
+def figure_ratio(pf, name, m_doc, o_doc, path):
+    """mcslab / OpenMC per depth bin for the flux and every score of the
+    material total, +-1 SE. x is the bin index, so every bin has the same
+    width whatever its thickness; layers are banded. Points beyond the
+    y range are drawn as triangles on its edge."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    spec = pf["problems"][name]
+    fig, axes = plt.subplots(4, 2, figsize=(11, 12), facecolor=SURFACE)
+    axes = axes.ravel()
+    counts = [ly["depth_bins"] for ly in spec["layers"]]
+    starts = np.concatenate([[0], np.cumsum(counts)])
+    for k, (key, label) in enumerate(RATIO_PANELS):
+        ax = axes[k]
+        _style(ax)
+        _layer_bands(ax, spec, [(starts[i] - 0.5, starts[i + 1] - 0.5)
+                                for i in range(len(counts))])
+        ax.axhline(1.0, color=INK2, lw=1.0, zorder=1)
+        xs, rs, es = [], [], []
+        for i, layer in enumerate(spec["layers"]):
+            ln = layer["name"]
+            if key == "flux":
+                mb, ob = m_doc["bins"][ln]["flux"], o_doc["bins"][ln]["flux"]
+            elif structurally_zero(m_doc, layer, key, "total"):
+                continue
+            else:
+                mb = m_doc["bins"][ln]["scores"][key]["total"]
+                ob = o_doc["bins"][ln]["scores"][key]["total"]
+            r, e = _ratio(mb["mean"], mb["se"], ob["mean"], ob["se"])
+            xs.append(np.arange(starts[i], starts[i + 1]))
+            rs.append(r)
+            es.append(e)
+        if not xs:
+            ax.set_title(label, loc="left", color=INK, fontsize=9.5, pad=4)
+            ax.text(0.5, 0.5, "no data for any nuclide of this problem\n(both codes score "
+                    "exactly 0)", transform=ax.transAxes, ha="center", va="center",
+                    color=INK2, fontsize=8.5)
+            ax.set_yticks([])
+            ax.set_xlim(-0.5, starts[-1] - 0.5)
+            continue
+        x, r, e = np.concatenate(xs), np.concatenate(rs), np.concatenate(es)
+        ok = np.isfinite(r)
+        dev = np.abs(r[ok] - 1.0) + e[ok]
+        lim = max(0.005, 1.15 * float(np.quantile(dev, 0.95))) if dev.size else 0.05
+        inside = ok & (np.abs(r - 1.0) <= lim)
+        ax.errorbar(x[inside], r[inside], yerr=e[inside], fmt="o", ms=3, color=SERIES[0],
+                    ecolor=SERIES[0], elinewidth=0.9, capsize=0, lw=0, zorder=3)
+        hi, lo = ok & (r > 1.0 + lim), ok & (r < 1.0 - lim)
+        ax.plot(x[hi], np.full(hi.sum(), 1.0 + lim), "^", ms=4, color=SERIES[0], clip_on=False)
+        ax.plot(x[lo], np.full(lo.sum(), 1.0 - lim), "v", ms=4, color=SERIES[0], clip_on=False)
+        ax.set_ylim(1.0 - lim, 1.0 + lim)
+        ax.set_xlim(-0.5, starts[-1] - 0.5)
+        missing = [ly["name"] for ly in spec["layers"]
+                   if key != "flux" and structurally_zero(m_doc, ly, key, "total")]
+        note = f"  (no data in {', '.join(missing)})" if missing else ""
+        ax.set_title(f"{label}{note}", loc="left", color=INK, fontsize=9.5, pad=4)
+        ax.set_ylabel("mcslab / OpenMC", color=INK2, fontsize=8)
+    for ax in axes[len(RATIO_PANELS):]:
+        ax.axis("off")
+    axes[-1].text(0.02, 0.9, "How to read: each point is mcslab / OpenMC for one depth bin,\n"
+                  "+-1 SE of the ratio. Neighbouring bins share histories, so a\n"
+                  "run-wide fluctuation (e.g. in the fast flux at depth)\n"
+                  "moves a whole layer together. Pass/fail is judged only on\n"
+                  "the layer-integrated primary checks (benchmark/compare.py).\n"
+                  "Triangles: points beyond the y range, drawn on its edge.",
+                  transform=axes[-1].transAxes, ha="left", va="top", color=INK2, fontsize=8.5)
+    bins = ", ".join(f"{ly['name']} {ly['depth_bins']} x "
+                     f"{(ly['x_cm'][1] - ly['x_cm'][0]) / ly['depth_bins']:g} cm"
+                     for ly in spec["layers"])
+    for ax in axes[len(RATIO_PANELS) - 2:len(RATIO_PANELS)]:
+        ax.set_xlabel(f"depth bin ({bins})", color=INK2, fontsize=8)
+    fig.suptitle(f"{name}: {spec['title']}\nmcslab / OpenMC per depth bin, material total, "
+                 f"+-1 SE ({spec['n_batches']} x {spec['histories_per_batch']:,} "
+                 "histories per code)", x=0.01, ha="left", color=INK, fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.97), h_pad=2.2)
+    fig.savefig(path, dpi=130, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def figure_spectra(pf, name, m_doc, o_doc, path):
+    """Flux per unit lethargy in each layer (both codes) and the ratio
+    with +-1 SE, on the 246-bin grid."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    spec = pf["problems"][name]
+    edges = np.asarray(pf["spectrum_edges_eV"])
+    du = np.log(edges[1:] / edges[:-1])
+    n = len(spec["layers"])
+    # energy axis: a decade below the lowest bin with flux in either code
+    lowest = min(edges[np.flatnonzero(np.asarray(doc["spectrum"][ly["name"]]["mean"]) > 0)[0]]
+                 for doc in (m_doc, o_doc) for ly in spec["layers"])
+    xlim = (lowest / 10.0, edges[-1])
+    fig, axes = plt.subplots(2, n, figsize=(max(4.2 * n + 0.6, 8.0), 6.4), facecolor=SURFACE,
+                             gridspec_kw={"height_ratios": [2.2, 1]}, squeeze=False)
+    for j, layer in enumerate(spec["layers"]):
+        ln = layer["name"]
+        top, bot = axes[0, j], axes[1, j]
+        _style(top)
+        _style(bot)
+        for k, (code, doc, ls) in enumerate((("mcslab", m_doc, "-"), ("OpenMC", o_doc, "--"))):
+            y = np.asarray(doc["spectrum"][ln]["mean"]) / du
+            top.stairs(np.where(y > 0, y, np.nan), edges, color=SERIES[k], lw=1.4, ls=ls,
+                       label=code)
+        top.set_xscale("log")
+        top.set_yscale("log")
+        top.set_xlim(*xlim)
+        top.set_title(f"{ln} ({layer['x_cm'][0]:g}-{layer['x_cm'][1]:g} cm)", loc="left",
+                      color=INK, fontsize=9.5)
+        if j == 0:
+            top.set_ylabel("flux per unit lethargy\n(cm per source neutron)", color=INK2,
+                           fontsize=8)
+            top.legend(frameon=False, fontsize=8, labelcolor=INK2, loc="upper left")
+        doc_m, doc_o = m_doc["spectrum"][ln], o_doc["spectrum"][ln]
+        r, e = _ratio(doc_m["mean"], doc_m["se"], doc_o["mean"], doc_o["se"])
+        c = np.sqrt(edges[:-1] * edges[1:])
+        ok = np.isfinite(r) & (e < 0.2)
+        bot.axhline(1.0, color=INK2, lw=1.0)
+        bot.errorbar(c[ok], r[ok], yerr=e[ok], fmt="o", ms=2.2, color=SERIES[0],
+                     ecolor=SERIES[0], elinewidth=0.7, capsize=0, lw=0)
+        bot.set_xscale("log")
+        bot.set_xlim(top.get_xlim())
+        bot.set_ylim(0.8, 1.2)
+        bot.set_xlabel("neutron energy (eV)", color=INK2, fontsize=8)
+        if j == 0:
+            bot.set_ylabel("mcslab / OpenMC\n(bins with SE < 20%)", color=INK2, fontsize=8)
+    fig.suptitle(f"{name}: {spec['title']}\nTrack-length flux spectrum per layer, "
+                 "246 bins (20 per decade)", x=0.01, ha="left", color=INK, fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.savefig(path, dpi=130, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def figure_z(pf, summary, path):
+    """Per problem: histogram of the per-bin diagnostic z (flux, scores,
+    spectrum, uncollided) against N(0,1), with the primary checks' z as
+    ticks below."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, len(PROBLEMS), figsize=(13, 3.6), facecolor=SURFACE,
+                             sharey=False)
+    grid = np.linspace(-5, 5, 401)
+    for ax, name in zip(axes, PROBLEMS):
+        _style(ax)
+        spec = pf["problems"][name]
+        _, z = per_bin(spec, name, load("mcslab", name), load("openmc", name),
+                       pf["spectrum_edges_eV"])
+        z = z[np.isfinite(z)]
+        clipped = np.clip(z, -5.0, 5.0)
+        ax.hist(clipped, bins=np.linspace(-5, 5, 41), density=True, color=SERIES[0],
+                alpha=0.85, edgecolor=SURFACE, lw=0.6)
+        ax.plot(grid, np.exp(-0.5 * grid ** 2) / math.sqrt(2 * math.pi), color=INK, lw=1.4,
+                label="N(0, 1)")
+        prim = np.array([r["z"] for r in summary["problems"][name]["primary"]])
+        ax.plot(np.clip(prim, -5, 5), np.full(prim.size, -0.02), "|", color=SERIES[1], ms=9,
+                mew=1.4, clip_on=False, label="primary checks")
+        a = summary["problems"][name]["per_bin"]["all"]
+        ax.text(0.98, 0.97, f"{a['n']} bins\n|z|>2: {100 * a['frac_gt_2']:.1f}%\n"
+                f"|z|>3: {100 * a['frac_gt_3']:.2f}%\nmax {a['max_abs']:.1f}",
+                transform=ax.transAxes, ha="right", va="top", color=INK2, fontsize=7.5)
+        ax.set_title(name, loc="left", color=INK, fontsize=10)
+        ax.set_xlim(-5, 5)
+        ax.set_ylim(-0.04, None)
+        ax.set_xlabel("z (|z| > 5 shown at the edge)", color=INK2, fontsize=8)
+    axes[0].set_ylabel("density", color=INK2, fontsize=8)
+    axes[0].legend(frameon=False, fontsize=7.5, labelcolor=INK2, loc="upper left")
+    fig.suptitle("Per-bin diagnostics, mcslab vs OpenMC: z distribution (bins are "
+                 "correlated; descriptive only)", x=0.01, ha="left", color=INK, fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.savefig(path, dpi=130, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def make_figures(summary):
+    pf = problems()
+    os.makedirs(FIG_DIR, exist_ok=True)
+    out = []
+    for name in PROBLEMS:
+        m_doc, o_doc = load("mcslab", name), load("openmc", name)
+        for kind, fn in (("ratio", figure_ratio), ("spectra", figure_spectra)):
+            path = os.path.join(FIG_DIR, f"phase4_{kind}_{name}.png")
+            fn(pf, name, m_doc, o_doc, path)
+            out.append(path)
+    path = os.path.join(FIG_DIR, "phase4_z.png")
+    figure_z(pf, summary, path)
+    out.append(path)
+    for p in out:
+        print(f"wrote {os.path.relpath(p, REPO)}")
+
+
 def fmt(pair, digits=5):
     return f"{pair[0]:.{digits}g} ± {pair[1]:.2g}"
 
@@ -504,7 +735,10 @@ def tables(summary):
 
 
 def main():
-    argparse.ArgumentParser(description=__doc__.split("\n")[0]).parse_args()
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--figures", action="store_true",
+                    help="also write docs/figures/phase4_*.png (needs matplotlib)")
+    args = ap.parse_args()
     summary = compare_all()
     sha = jsonio.write(summary, COMPARISON_JSON)
     print(tables(summary))
@@ -521,6 +755,8 @@ def main():
                   f"{d['max_abs_change_se']:.2f} SE ({d['max_change_se_at']}); "
                   f"{d['n_beyond_3_vs_mcslab']} beyond 3 SE against mcslab")
     print(f"wrote {os.path.relpath(COMPARISON_JSON, REPO)} (sha256 {sha[:12]})")
+    if args.figures:
+        make_figures(summary)
 
 
 if __name__ == "__main__":
