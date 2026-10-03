@@ -15,8 +15,10 @@ from . import tallies as T
 from .collision import pack_physics
 from .config import Results
 from .config_ce import LogUniform, MonoEnergetic
+from .depth_mesh import DepthMesh, make_mesh
 from .geometry import SlabGeometry
 from .nucdata import DEFAULT_TEMPERATURE_K, TEMPERATURE_TOLERANCE, temperature_key
+from .responses import RESPONSE_MTS, pack_responses
 from .rng import STRIDE, validate_seed
 from .sources import BeamSource, IsotropicPlaneSource
 from .tracks import TF_NCOL, TI_NCOL, Tracks
@@ -59,6 +61,10 @@ class KinRunConfig:
         tally.
     track_capacity: events kept per recorded history (more are counted as
         truncated).
+    depth_bins: uniform depth bins per region for the response tallies
+        (Phase 3; mcslab/depth_mesh.py, mcslab/responses.py). None (the
+        default) turns them off. They draw no random number and change no
+        other output.
     """
     geometry: SlabGeometry
     source: Source
@@ -76,6 +82,7 @@ class KinRunConfig:
     free_gas: bool = True
     n_track: int = 0
     track_capacity: int = 4000
+    depth_bins: Optional[Tuple[int, ...]] = None
 
     def __post_init__(self):
         if self.n_batches < 2:
@@ -86,6 +93,10 @@ class KinRunConfig:
             raise ValueError("bank_capacity must be >= 1")
         if self.n_track < 0 or self.track_capacity < 1:
             raise ValueError("n_track must be >= 0 and track_capacity >= 1")
+        if self.depth_bins is not None and (
+                len(self.depth_bins) != self.geometry.n_regions
+                or any(int(n) < 1 for n in self.depth_bins)):
+            raise ValueError("depth_bins needs one count >= 1 per region")
         validate_seed(self.seed)
 
     @property
@@ -108,6 +119,13 @@ class KinResults(Results):
     channel_labels: Tuple[Tuple[str, int], ...] = ()
     energy_edges: np.ndarray = None
     energy_cutoff: float = 0.0
+    # Phase 3 response tallies (tallies.py layout); zero depth bins when off
+    tally: np.ndarray = None             # (B, n_bins, n_nuclides + 1, N_RESP, N_EST)
+    mesh_flux: np.ndarray = None         # (B, n_bins, N_EST)
+    mesh: Optional[DepthMesh] = None
+    tally_nuclides: Tuple[str, ...] = ()  # packed nuclide labels, then "total"
+    response_present: np.ndarray = None  # (n_nuclides, N_RESP) bool: data exist
+    region_atom_density: np.ndarray = None  # (n_regions,) atoms / (b cm)
 
     @property
     def counts(self) -> np.ndarray:
@@ -146,6 +164,21 @@ class KinResults(Results):
         """(events, secondaries created) summed over batches for one channel."""
         c = self.channel_labels.index((nuclide, mt))
         return int(self.chan_events[:, c].sum()), int(self.chan_created[:, c].sum())
+
+    def tally_batches(self, response: int, estimator: int,
+                      nuclide: Optional[str] = None) -> np.ndarray:
+        """(B, n_bins) per source particle: one response (tallies.R_*) and
+        estimator (tallies.EST_*), for one nuclide label or, with None, the
+        material total. Track length: integrated over the bin width (e.g.
+        eV of heating in the bin per source neutron per cm^2 of wall)."""
+        k = len(self.tally_nuclides) - 1 if nuclide is None else \
+            self.tally_nuclides.index(nuclide)
+        return self.tally[:, :, k, response, estimator] / self._n
+
+    def mesh_flux_batches(self, estimator: int) -> np.ndarray:
+        """(B, n_bins) per source particle, integrated over the bin width
+        (cm); divide by mesh.bin_width for the bin-averaged flux."""
+        return self.mesh_flux[:, :, estimator] / self._n
 
     def channel_zero(self, nuclide: str, mt: int) -> int:
         """Zero-yield events of one channel, summed over batches."""
@@ -264,8 +297,24 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
         raise ValueError("energy_edges must be strictly increasing, at least 2 values")
 
     n_ch = phys.ch_int.shape[0]
+    n_nuc = len(p.nuclide_names)
+    if config.depth_bins is not None:
+        mesh = make_mesh(g.bounds, config.depth_bins)
+        resp = pack_responses(p.nuclide_names, nuclides)
+        rxs, roff, rthr = resp.rxs, resp.roff, resp.rthr
+    else:
+        mesh = None
+        rxs = np.zeros(1, dtype=np.float64)
+        roff = np.zeros((n_nuc, len(RESPONSE_MTS)), dtype=np.int64)
+        rthr = np.zeros((n_nuc, len(RESPONSE_MTS)), dtype=np.int64)
+    m_edges = mesh.edges if mesh is not None else np.zeros(0, dtype=np.float64)
+    m_eoff = mesh.eoff if mesh is not None else np.zeros(1, dtype=np.int64)
+    m_boff = mesh.boff if mesh is not None else np.zeros(1, dtype=np.int64)
     if out is None:
         arrays = T.allocate_kin(config.n_batches, g.n_regions, edges.size - 1, n_ch)
+        tally, mesh_flux = T.allocate_tally(config.n_batches, mesh.n_bins if mesh is not None else 0,
+                                            n_nuc)
+        dens = np.array([p.mat_dens[p.m_off[m]:p.m_off[m + 1]].sum() for m in mat_of_region])
         n_track = min(int(config.n_track), config.n_histories)
         cap = int(config.track_capacity) if n_track else 1
         tracks = Tracks(np.zeros((n_track, cap, TF_NCOL)),
@@ -277,7 +326,12 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                          chan_created=arrays[6], zero_yield_weight=arrays[7],
                          chan_zero=arrays[8], channel_labels=phys.labels,
                          energy_edges=edges, energy_cutoff=e_cut,
-                         tracks=tracks if n_track else None)
+                         tracks=tracks if n_track else None,
+                         tally=tally, mesh_flux=mesh_flux, mesh=mesh,
+                         tally_nuclides=tuple(p.nuclide_names) + ("total",),
+                         response_present=(resp.present if mesh is not None else
+                                           np.zeros((n_nuc, T.N_RESP), dtype=bool)),
+                         region_atom_density=dens)
     b0, b1 = (0, config.n_batches) if batch_range is None else batch_range
     if not 0 <= b0 <= b1 <= config.n_batches:
         raise ValueError(f"bad batch range {batch_range}")
@@ -294,7 +348,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                     out.region_sums, out.surface_sums, out.spectrum, out.cutoff_weight,
                     out.diagnostics, out.chan_events, out.chan_created,
                     out.zero_yield_weight, out.chan_zero,
-                    *_track_args(out))
+                    *_track_args(out),
+                    rxs, roff, rthr, m_edges, m_eoff, m_boff, out.tally, out.mesh_flux)
 
     if b1 > b0:
         worst = int(out.diagnostics[b0:b1, T.K_MAX_DRAWS].max())

@@ -56,6 +56,19 @@ number and writes no tally, so tallies are bit-identical with recording
 on or off (tests/test_tracks.py). A full slot range counts the dropped
 events in trk_trunc[h]; physics is unaffected.
 
+Response tallies (Phase 3, opt-in). With a depth mesh (n_bins > 0), every
+flight segment is split across the depth bins of its region after the fact
+(mcslab/depth_mesh.py) and scores w l N_k sigma_s(E) per nuclide k and
+response s (track length), and every collision scores w N_k sigma_s(E) /
+Sigma_t(E) in the bin of its position (collision estimator), with E the
+pre-collision energy, as OpenMC's track-length and collision estimators do
+(src/tallies/tally_scoring.cpp). sigma_s is interpolated with the grid index
+and factor macro_total already computed (mcslab/responses.py). The
+uncollided estimators score only the primary before its first collision.
+Like track recording, the tallies only read particle state: they draw no
+random number and write only their own rows, so every other output is
+bit-identical with them on or off (tests/test_tally_reproducibility.py).
+
 Random-number consumption per event (part of the regression contract):
   source energy   : monoenergetic 0; log-uniform 1 (drawn first)
   source direction: beam 0; isotropic 1
@@ -79,17 +92,20 @@ import numpy as np
 from numba import njit
 
 from . import collision as C
+from .depth_mesh import bin_of, segment_pieces
 from .geometry import distance_to_boundary
+from .responses import refresh_responses
 from .rng import RNG_DRAWS, RNG_SIZE, init_history, prn
 from .sources import sample_source
 from .tracks import (EV_ABSORB, EV_BORN, EV_COLLISION, EV_CUTOFF, EV_LEAK, EV_LOST,
                      EV_SOURCE, EV_SURFACE, EV_ZERO_YIELD, TF_E, TF_T, TF_U, TF_X,
                      TI_EVENT, TI_MT, TI_PARENT, TI_PID, TI_REGION)
-from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, K_ABSORBED,
+from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, EST_COLL, EST_COLL_UNC,
+                      EST_TL, EST_TL_UNC, K_ABSORBED,
                       K_BORN_BELOW_CUTOFF, K_COLLISIONS, K_CREATED, K_CUTOFF, K_ELASTIC,
                       K_INELASTIC, K_LEAK_LEFT, K_LEAK_RIGHT, K_LOST, K_MAX_BANK,
-                      K_FREE_GAS, K_MAX_DRAWS, K_SOURCE, K_ZERO_YIELD, NEG, POS, SPEC_COLL,
-                      SPEC_TL, TRACK_LENGTH)
+                      K_FREE_GAS, K_MAX_DRAWS, K_SOURCE, K_ZERO_YIELD, N_RESP, NEG, POS,
+                      SPEC_COLL, SPEC_TL, TRACK_LENGTH)
 from .transport_ce import sample_energy
 from .xs import grid_locate, interp_at
 
@@ -168,6 +184,67 @@ def record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, ev, mt, r, x
 
 
 @njit(cache=True)
+def score_track(tal, flx, m_edges, m_eoff, m_boff, r, x0, u, d, wgt, unc, j0, j1, mat_nuc,
+                ns, ntot, pb, pl):
+    """Track-length estimators of one flight (x0, u, length d) in region r:
+    for each piece of length l in depth bin b, w l into the flux and
+    (w l) N_k sigma_s(E) per nuclide k (material slots j0 .. j1 - 1) and for
+    the material total (last nuclide slot); also into the uncollided
+    estimator when unc is set. ns, ntot hold N sigma at the flight energy."""
+    e0 = m_eoff[r]
+    npc = segment_pieces(m_edges, e0, m_eoff[r + 1] - e0 - 1, x0, u, d, pb, pl)
+    tot = tal.shape[1] - 1
+    b0 = m_boff[r]
+    for q in range(npc):
+        b = b0 + pb[q]
+        wl = wgt * pl[q]
+        flx[b, EST_TL] += wl
+        if unc:
+            flx[b, EST_TL_UNC] += wl
+        for j in range(j0, j1):
+            k = mat_nuc[j]
+            jj = j - j0
+            for s in range(N_RESP):
+                v = wl * ns[jj, s]
+                tal[b, k, s, EST_TL] += v
+                if unc:
+                    tal[b, k, s, EST_TL_UNC] += v
+        for s in range(N_RESP):
+            v = wl * ntot[s]
+            tal[b, tot, s, EST_TL] += v
+            if unc:
+                tal[b, tot, s, EST_TL_UNC] += v
+
+
+@njit(cache=True)
+def score_collision(tal, flx, m_edges, m_eoff, m_boff, r, x, c, unc, j0, j1, mat_nuc,
+                    ns, ntot):
+    """Collision estimators at a collision at x in region r, with
+    c = w / Sigma_t(E) at the pre-collision energy: c into the flux and
+    c N_k sigma_s(E) per nuclide and for the total, in the depth bin of x;
+    also into the first-collision estimator when unc is set."""
+    e0 = m_eoff[r]
+    b = m_boff[r] + bin_of(m_edges, e0, m_eoff[r + 1] - e0 - 1, x)
+    tot = tal.shape[1] - 1
+    flx[b, EST_COLL] += c
+    if unc:
+        flx[b, EST_COLL_UNC] += c
+    for j in range(j0, j1):
+        k = mat_nuc[j]
+        jj = j - j0
+        for s in range(N_RESP):
+            v = c * ns[jj, s]
+            tal[b, k, s, EST_COLL] += v
+            if unc:
+                tal[b, k, s, EST_COLL_UNC] += v
+    for s in range(N_RESP):
+        v = c * ntot[s]
+        tal[b, tot, s, EST_COLL] += v
+        if unc:
+            tal[b, tot, s, EST_COLL_UNC] += v
+
+
+@njit(cache=True)
 def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           egrid, e_off, tot, absn, m_off, mat_nuc, mat_dens,
                           nuc_awr, nuc_kT, fg_threshold, free_gas,
@@ -176,11 +253,16 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           e_cut, spec_edges,
                           reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
                           bank_f, bank_r, bank_p, ci, cf, ct, rng,
-                          n_track, trk_f, trk_i, trk_n, trk_trunc):
+                          n_track, trk_f, trk_i, trk_n, trk_trunc,
+                          rxs, roff, rthr, m_edges, m_eoff, m_boff, tal, flx, ns, ntot,
+                          pb, pl):
     """Follow one source neutron and all its secondaries. Tallies go to this
-    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz). If
+    batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz, and the
+    response rows tal, flx when the depth mesh has bins). If
     history < n_track its events are recorded in track slot `history`.
     Returns (draws used by the family, lost flag)."""
+    do_tal = flx.shape[0] > 0
+    unc = 1          # the primary is uncollided until its first collision
     init_history(rng, master_seed, np.uint64(history))
     n_regions = mat_of_region.shape[0]
     cap = bank_f.shape[0]
@@ -212,6 +294,9 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
             if m != last_m or E != last_E:
                 st = macro_total(m, E, egrid, e_off, tot, m_off, mat_nuc, mat_dens,
                                  ci, cf, ct)
+                if do_tal:
+                    refresh_responses(m, m_off, mat_nuc, mat_dens, e_off, absn, rxs, roff,
+                                      rthr, ci, cf, ns, ntot)
                 last_m = m
                 last_E = E
             if st > 0.0:
@@ -222,6 +307,9 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
             g = energy_bin(spec_edges, E)
 
             if d_coll < d_bdy:
+                if do_tal:
+                    score_track(tal, flx, m_edges, m_eoff, m_boff, r, x, u, d_coll, wgt, unc,
+                                m_off[m], m_off[m + 1], mat_nuc, ns, ntot, pb, pl)
                 x += d_coll * u
                 t += d_coll / speed(E)
                 reg[TRACK_LENGTH, r] += wgt * d_coll
@@ -231,6 +319,10 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                     spec[SPEC_TL, r, g] += wgt * d_coll
                     spec[SPEC_COLL, r, g] += wgt / st
                 cnt[K_COLLISIONS] += 1
+                if do_tal:
+                    score_collision(tal, flx, m_edges, m_eoff, m_boff, r, x, wgt / st, unc,
+                                    m_off[m], m_off[m + 1], mat_nuc, ns, ntot)
+                unc = 0
 
                 # -- nuclide, then absorption, then scatter channel (OpenMC order)
                 j = C.sample_nuclide(m, m_off, mat_dens, ct, st, rng)
@@ -330,6 +422,9 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                         record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
                                      EV_LOST, 0, r, x, u, E, t)
                     break
+                if do_tal:
+                    score_track(tal, flx, m_edges, m_eoff, m_boff, r, x, u, d_bdy, wgt, unc,
+                                m_off[m], m_off[m + 1], mat_nuc, ns, ntot, pb, pl)
                 reg[TRACK_LENGTH, r] += wgt * d_bdy
                 if g >= 0:
                     spec[SPEC_TL, r, g] += wgt * d_bdy
@@ -368,6 +463,7 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
         r = bank_r[n_bank]
         pid = bank_p[n_bank, 0]
         parent = bank_p[n_bank, 1]
+        unc = 0
         if slot >= 0:
             record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent, EV_BORN, 0, r,
                          x, u, E, t)
@@ -384,14 +480,19 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                     e_cut, spec_edges, bank_capacity,
                     region_sums, surface_sums, spectrum, cutoff_weight, counts,
                     chan_events, chan_created, zero_yield_weight, chan_zero,
-                    n_track, trk_f, trk_i, trk_n, trk_trunc):
+                    n_track, trk_f, trk_i, trk_n, trk_trunc,
+                    rxs, roff, rthr, m_edges, m_eoff, m_boff, tally, mesh_flux):
     """Run batches [batch_start, batch_end), writing only their rows. Same
     structure and guarantees as transport.run_batches: batch b runs
     histories b*n .. b*n + n - 1, each seeded from (master_seed, id) only.
-    Track slots of the histories run here are cleared first."""
+    Track slots of the histories run here are cleared first. tally and
+    mesh_flux have zero depth bins when the response tallies are off."""
     max_nuc = 0
     for m in range(m_off.shape[0] - 1):
         max_nuc = max(max_nuc, m_off[m + 1] - m_off[m])
+    max_bins = 1
+    for r in range(m_eoff.shape[0] - 1):
+        max_bins = max(max_bins, m_eoff[r + 1] - m_eoff[r] - 1)
     for b in range(batch_start, batch_end):
         reg = region_sums[b]
         surf = surface_sums[b]
@@ -411,6 +512,14 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
         chcr[:] = 0
         zyw[:] = 0.0
         chz[:] = 0
+        tal = tally[b]
+        flx = mesh_flux[b]
+        tal[:, :, :, :] = 0.0
+        flx[:, :] = 0.0
+        ns = np.zeros((max(max_nuc, 1), N_RESP), dtype=np.float64)
+        ntot = np.zeros(N_RESP, dtype=np.float64)
+        pb = np.zeros(max_bins, dtype=np.int64)
+        pl = np.zeros(max_bins, dtype=np.float64)
         rng = np.zeros(RNG_SIZE, np.uint64)
         bank_f = np.zeros((bank_capacity, B_NCOL), dtype=np.float64)
         bank_r = np.zeros(bank_capacity, dtype=np.int64)
@@ -435,7 +544,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                 e_cut, spec_edges,
                 reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
                 bank_f, bank_r, bank_p, ci, cf, ct, rng,
-                n_track, trk_f, trk_i, trk_n, trk_trunc)
+                n_track, trk_f, trk_i, trk_n, trk_trunc,
+                rxs, roff, rthr, m_edges, m_eoff, m_boff, tal, flx, ns, ntot, pb, pl)
             if draws > max_draws:
                 max_draws = draws
         cnt[K_MAX_DRAWS] = max_draws
