@@ -8,7 +8,7 @@ The README / Part 1 problem, with identical inputs: pure H-1 at
 10 batches x 1000 histories, seed 3, default energy cutoff (1e-5 eV).
 
 - "before": free_gas=False, the target always at rest, as in Part 1. The
-  script asserts the Part 1 balance exactly (commit cf0a925): source 10000,
+  script asserts the Part 1 balance exactly (commit de952b1): source 10000,
   absorbed 1013, leaked 1421 / 625, cutoff 6941, residual 0.
 - "after": free-gas target motion as in OpenMC (H-1 has awr < 1, so at
   every energy). Neutrons now thermalise near kT = 0.0253 eV instead of

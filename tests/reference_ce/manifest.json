@@ -1,7 +1,7 @@
 {
   "reason": "Initial Phase 2a CE reference: first-collision-ends-history kernel on ENDF/B-VIII.0 294 K data (W | void | FLiBe | Fe, log-uniform 1 keV-14.1 MeV), validated by tests/test_nucdata.py",
   "recorded_utc": "2026-09-29T22:46:06+00:00",
-  "git_commit": "84b88164228a627706cbb0f125e20d8f27443d04",
+  "git_commit": "52fb445194f955cc788ed21904dd5e0f7693fd92",
   "git_dirty": false,
   "environment": {
     "python": "3.9.6",

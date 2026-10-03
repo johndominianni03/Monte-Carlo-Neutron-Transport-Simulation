@@ -1,7 +1,7 @@
 {
   "reason": "provenance update after author-email history rewrite; arrays unchanged",
   "recorded_utc": "2026-09-30T20:35:16+00:00",
-  "git_commit": "95d2f9860d4de644f446a1532a8768e6ec1abeea",
+  "git_commit": "d821260848532fb22c627007622b86d69fc92d86",
   "git_dirty": false,
   "environment": {
     "python": "3.9.6",

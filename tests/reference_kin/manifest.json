@@ -1,7 +1,7 @@
 {
   "reason": "Initial Phase 2b kinematic reference (test h, problem D7): W 0.5 / FLiBe 20 / Fe 10 cm, 14.1 MeV beam, 20 x 5000, seed 20261023; first record, after all Part 2 physics landed (ACE law 61 / law 4 / applicability / tabulated-yield samplers, zero-yield tally, OpenMC cxs free gas, per-material temperature with FLiBe on 900 K data)",
   "recorded_utc": "2026-10-02T00:33:17+00:00",
-  "git_commit": "f7668f5b3f4a37eb42fe0b4cb8bcd1564ba281ce",
+  "git_commit": "071ca871d18b1e661e90237a3f14c1ab173a3794",
   "git_dirty": false,
   "environment": {
     "python": "3.9.6",

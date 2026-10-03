@@ -40,16 +40,16 @@ already merged)". In this repository it is not:
 
 | ref | commit | contents |
 |---|---|---|
-| `main` | `da7822a` | Phase 1 only |
-| `phase-2a` | `397ff86` | Phase 1 + all of Phase 2a (strict descendant of `main`; merging is a fast-forward) |
+| `main` | `8e53f68` | Phase 1 only |
+| `phase-2a` | `525cff1` | Phase 1 + all of Phase 2a (strict descendant of `main`; merging is a fast-forward) |
 
 No remote is configured, so a merge done elsewhere (e.g. on GitHub) is not
-visible here. `phase-2b` has been created from `397ff86`, the tip of
+visible here. `phase-2b` has been created from `525cff1`, the tip of
 `phase-2a`, which is exactly what `main` would be after the merge.
 
 Resolved at approval: `main` was verified to be an ancestor of `phase-2a`
 and fast-forwarded with `git branch -f main phase-2a`. `main`, `phase-2a`
-and `phase-2b` now all start at `397ff86`.
+and `phase-2b` now all start at `525cff1`.
 
 Both regression compares pass on this base:
 - Phase 1: 6 arrays, byte-exact.
@@ -57,7 +57,7 @@ Both regression compares pass on this base:
 
 **Step 0: Phase 1 manifest provenance.** `tests/reference/manifest.json`
 names commit `91c1864`. That is the pre-rewrite hash of what is now
-`c33fd6d` ("Add analytic physics validation suite"). The object still
+`cdcd09d` ("Add analytic physics validation suite"). The object still
 exists locally but is unreachable from any branch.
 
 1. Keep a copy of the current `reference.npz`.
@@ -311,7 +311,7 @@ level.
      x = 0, 10 batches x 1000 histories, seed 3, default energy cutoff
      (1e-5 eV).
    - Report the cutoff fraction before and after, with the full balance.
-   - Before (Part 1, target at rest, commit `cf0a925`): source 10000,
+   - Before (Part 1, target at rest, commit `de952b1`): source 10000,
      absorbed 1013, leaked left 1421, leaked right 625, cutoff 6941
      (0.6941), residual 0.
    - Expected after: the cutoff becomes the sub-1e-5 eV tail of a 294 K
@@ -384,7 +384,7 @@ This section refines the Part 2 outline above for the Part 2 request
 - **If any statistical check fails during implementation:** stop and
   report it. Seeds and thresholds are not changed.
 
-**Baseline at `293eb66`** (re-checked 2026-10-01):
+**Baseline at `2c1490b`** (re-checked 2026-10-01):
 - 119 tests pass.
 - Phase 1 and Phase 2a compares are byte-exact.
 - The Part 1 hydrogen run reproduces: cutoff 6941 / 10000, residual 0.
@@ -917,20 +917,20 @@ Anything else found during implementation is added when found.
 
 ## Status
 
-- [x] Branch `phase-2b` created from `phase-2a` tip `397ff86`. `main`
-      (`da7822a`, Phase 1 only) not touched.
+- [x] Branch `phase-2b` created from `phase-2a` tip `525cff1`. `main`
+      (`8e53f68`, Phase 1 only) not touched.
 - [x] Baseline: Phase 1 and Phase 2a regression compares pass byte-exact.
-- [x] Plan approved (2026-09-30). `main` fast-forwarded to `397ff86`.
+- [x] Plan approved (2026-09-30). `main` fast-forwarded to `525cff1`.
 - [x] Part 1 (2026-09-30):
-  - [x] 2. Step 0, `ddfa2a9`. Arrays and `reference.npz` byte-identical
+  - [x] 2. Step 0, `5a3efd7`. Arrays and `reference.npz` byte-identical
         to before; only `manifest.json` changed.
-  - [x] 3. Reader, `210238c`. Inventory regenerates byte-identically.
-  - [x] 4. Samplers and (a2), `3fdec1b`.
-  - [x] 5. Collision physics, `f78786e`.
+  - [x] 3. Reader, `96ae0ad`. Inventory regenerates byte-identically.
+  - [x] 4. Samplers and (a2), `6686331`.
+  - [x] 5. Collision physics, `8818916`.
   - [x] 6. Kernel, driver, bank, synthetic nuclides, reproducibility
-        test, `e2292f4`.
-  - [x] 7. Tests (a), (b), `ef814ff`.
-  - [x] 8. Tests (c), (d), `cf0a925`. Adds the K_BORN_BELOW_CUTOFF
+        test, `21a70f3`.
+  - [x] 7. Tests (a), (b), `3b9e8ea`.
+  - [x] 8. Tests (c), (d), `de952b1`. Adds the K_BORN_BELOW_CUTOFF
         counter.
   - [x] 9. Docs: `docs/deviations_from_openmc.md`, README,
         this status, and the hydrogen re-run added to Part 2.
@@ -943,16 +943,16 @@ Anything else found during implementation is added when found.
       detailed plan" above). The free-gas test description was corrected
       the same day, before any free-gas code or test existed.
 - [x] Part 2 implementation (2026-10-01):
-  - [x] 1. Plan, approved, with the free-gas correction: `d51b5c3`.
-  - [x] 2. Law inventory script and `docs/law_inventory.md`: `f994c59`.
+  - [x] 1. Plan, approved, with the free-gas correction: `5b1ef53`.
+  - [x] 2. Law inventory script and `docs/law_inventory.md`: `504fbd2`.
   - [x] 3. Reader for law 61, law 4, applicability and `Tabulated1D`
-        yields: `a2ff6af`.
+        yields: `dfa5d78`.
         - `docs/data_inventory.md` regenerates byte-identically.
         - Found: 1275 outgoing-energy tables repeat their last point, with
           zero mass after c = 1. They are accepted, and recorded in the
           inventory.
   - [x] 4. Samplers, D2 yields, test (f) and the (a2) p-only check:
-        `4f31bde`.
+        `8144fee`.
         - OpenMC's last-bin angle-table quirk (`c_k1 == c_k`) is mirrored.
         - The law-frame mu may exceed 1 by about 1e-7, as in OpenMC (2.6e-8
           observed, bound 1e-6).
@@ -961,20 +961,20 @@ Anything else found during implementation is added when found.
           after the expected-count assertion failed, before Be9's
           statistic was ever computed. The other 8 cases were unchanged.
   - [x] 5. Kernel wiring, zero-yield tally (P2), unconditional refusal, and
-        test (g): `461f5b1`. The (g) kernel runs use a 1 MeV energy cutoff
+        test (g): `39f732b`. The (g) kernel runs use a 1 MeV energy cutoff
         to stay short.
   - [x] 6. Free gas, per-material temperature, `free_gas` switch (P3) and
-        free-gas tests: `218e29e`.
+        free-gas tests: `2adf679`.
         - A = 1 stationarity: p = 0.007, which passes. A diagnostic with
           2e6 events on three other seeds gave p = 0.40, 0.70 and 0.17.
         - A = 12 kernel shape: bin edges come from a 401-point CDF grid.
           A first run with 4001 points also passed (p = 0.98 / 0.92, now
           0.94 / 0.92).
-  - [x] 7. Hydrogen before/after: `f7668f5`. The cutoff fraction goes from
+  - [x] 7. Hydrogen before/after: `071ca87`. The cutoff fraction goes from
         0.6941 to 0.0001.
-  - [x] 8. Regression (h), D7 reference recorded once: `35324bc`.
-  - [x] 9. Track recording and its test: `73ec321`. D7 stays byte-exact.
-  - [x] 10. Track scripts, GIF and PNG: `ab37270`.
+  - [x] 8. Regression (h), D7 reference recorded once: `da6c762`.
+  - [x] 9. Track recording and its test: `6172d94`. D7 stays byte-exact.
+  - [x] 10. Track scripts, GIF and PNG: `82ee86d`.
   - [x] 11. Docs: deviations, README, this status.
   - No statistical check failed. Seeds and thresholds are as planned.
 - [ ] Later, after the user's history rewrite: provenance-only update of

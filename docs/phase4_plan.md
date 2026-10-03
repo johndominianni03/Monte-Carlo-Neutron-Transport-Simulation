@@ -236,7 +236,7 @@ e^-tau per layer.
 
 | # | Question | Decision |
 |---|---|---|
-| D23 | Branch | `main` fast-forwarded to `phase-3` (`fd30387`); branch `phase-4` from it; not pushed. Files are staged by explicit path. |
+| D23 | Branch | `main` fast-forwarded to `phase-3` (`4db8833`); branch `phase-4` from it; not pushed. Files are staged by explicit path. |
 | D24 | Cross-section index | A 14-entry `cross_sections.xml` written into the run directory after the sha256 checks. |
 | D25 | Run directory | Outside the repository (default `~/mcslab_openmc_runs/phase4/`, one subdirectory per run). It holds the XML, statepoints, `summary.h5` and OpenMC's log. Only the extracted JSON is committed. |
 | D26 | Geometry | x-planes at mcslab's bounds; reflective y and z planes at +-1000 cm; a void buffer cell -1 < x < 0 with vacuum at x = -1; x = 0 an internal surface in P1 and P4, reflective in P2 and P3; vacuum on the right. |
@@ -395,29 +395,29 @@ including packing; OpenMC 10 s (P1), 15.5 s (P3), 5.1 s (P4), plus about
 
 ## Status
 
-- [x] `main` fast-forwarded to `phase-3` (`fd30387`); branch `phase-4`
+- [x] `main` fast-forwarded to `phase-3` (`4db8833`); branch `phase-4`
       created.
 - [x] Plan approved (2026-10-03).
-- [x] 1. Plan: `e45345a`.
-- [x] 2. Corrections to Phase 3 statements: `88edd23`. New deviation 16
+- [x] 1. Plan: `0b160e3`.
+- [x] 2. Corrections to Phase 3 statements: `b1ee081`. New deviation 16
       (uncollided estimators), deviation 6 rewritten (generators), README
       and a comment in `mcslab/tallies.py`. All five regressions byte
       exact; 194 tests pass.
-- [x] 3. mcslab side and problem file: `27ca6e1`. The kernel's densities
+- [x] 3. mcslab side and problem file: `1e9c041`. The kernel's densities
       equal `CEMaterial.number_densities` and the D7 tally manifest bit
       for bit. A shared writer, `benchmark/jsonio.py` (standard library
       only), was added so both environments write identical JSON text.
-- [x] 4. OpenMC side: `b64ef67`. Development check on seed 20261199
+- [x] 4. OpenMC side: `108e951`. Development check on seed 20261199
       (P1, 2 x 1000): densities, mesh and spectrum edges read back
       bit-identical, settings as declared in `model.xml`, no lost
       particle, no local path.
-- [x] 5. Comparison, pytest and results: `de7ef56`. `compare.py` and the
+- [x] 5. Comparison, pytest and results: `5350c94`. `compare.py` and the
       pytest were written before the benchmark runs. All 82 primary
       checks pass; the failure protocol was not needed. The commit was
       amended once before any push (from `c53fc12`): the test for local
       paths matched its own pattern once the file was tracked, and the
       pattern is now assembled at run time.
-- [x] 6. Figures: `342eb1d`.
+- [x] 6. Figures: `08bcb89`.
 - [x] 7. Documentation: README Phase 4 section (setup, results, what
       differs and why, the default-settings numbers, reproduction, tests,
       limitations); deviations 2, 9 and 14 measured, new deviation 17;

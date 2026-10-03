@@ -4,7 +4,7 @@ This file records the approved Phase 3 plan so the work survives a session
 reset. The "Status" section at the bottom is updated as commits land.
 
 **Approval (2026-10-03):**
-- D8: branch `phase-3` off `main` at `fa5b245`, not pushed.
+- D8: branch `phase-3` off `main` at `5c6923e`, not pushed.
 - D9-D14, D16, D17, D21: accepted as recommended.
 - D15: per-bin first-flight checks (50 bins), for bin-offset coverage.
 - D18: hold the molar density; the natural-Li path stays bit-identical.
@@ -51,7 +51,7 @@ check is reported, never fixed by changing them.
   reflective plasma-side boundary, and a FLiBe thickness x enrichment
   sweep of tritium per source neutron.
 
-## Baseline (verified at `fa5b245`, 2026-10-03)
+## Baseline (verified at `5c6923e`, 2026-10-03)
 
 - 161 tests pass (93 s).
 - Phase 1, Phase 2a and D7 regression compares are byte-exact. D7 is also
@@ -287,7 +287,7 @@ the FPY length and the eV-to-J factor.
 
 | # | Question | Decision |
 |---|---|---|
-| D8 | Branch | `phase-3` off `main` (`fa5b245`); not pushed. First commit: this plan. |
+| D8 | Branch | `phase-3` off `main` (`5c6923e`); not pushed. First commit: this plan. |
 | D9 | W has no MT 205 | Scored exactly 0, as OpenMC does; flagged "no data" (`response_present`, README footnote) so it is not read as a measured zero. |
 | D10 | Tally contents | Scores 301, 901, 444, 205, 207 and absorption (for check 4; OpenMC's "absorption"). Nuclide axis: the 13 nuclides plus an in-kernel total (OpenMC's total-nuclide bin). Estimators TL, COLL, TL_UNC, COLL_UNC. Flux stored separately. |
 | D11 | Depth mesh | W 10 x 0.05 cm, FLiBe 20 x 1 cm, Fe 20 x 0.5 cm (50 bins). Edges from `np.linspace` per layer with exact layer bounds. Collision bin from position; a point on an internal edge goes to the right-hand bin. Phase 4: an OpenMC RectilinearMesh with the same x edges. |
@@ -435,40 +435,40 @@ the track-length Li-7 tritium.
 
 ## Status
 
-- [x] Branch `phase-3` created from `fa5b245`.
+- [x] Branch `phase-3` created from `5c6923e`.
 - [x] Plan approved (2026-10-03).
-- [x] 1. Plan: `0612734`.
-- [x] 2. Mesh, splitter, response packing: `83e1893`. Check 1: worst
+- [x] 1. Plan: `0290731`.
+- [x] 2. Mesh, splitter, response packing: `75cf9bf`. Check 1: worst
       per-bin error 2.9e-16 d and sum error 2.2e-16 d (bound 1e-12).
       Check 2: lookups bit-identical to the reader, 2.1e-16 from raw h5py.
-- [x] 3. Kernel and driver tallies: `b0f0f8c`. D7 with tallies on is
+- [x] 3. Kernel and driver tallies: `b5c7b19`. D7 with tallies on is
       byte-identical to `tests/reference_kin`; Phase 1, 2a and D7
       compares byte-exact; 172 tests pass.
-- [x] 4. Validation: `ad15aef`. All 80 statistical checks pass, largest
+- [x] 4. Validation: `68794ee`. All 80 statistical checks pass, largest
       |n_SE| 2.15 (TL_UNC, W bin 2). Uncollided ratios 7.3e-14, mesh vs
       region tallies 3.9e-14 (bounds 1e-11). The failure protocol was not
       needed. The first overhead diagnostic compared a cold first call
       with a warm one (+78%); it was corrected before the commit to two
       warm calls (+37% incl. packing); the statistical results were
       unchanged (same seed, same rows).
-- [x] 5. Tally regression and D7 reference: `d0fe4a4`. Recorded once at
-      `ad15aef` with a clean tree; 1033 KiB compressed.
-- [x] 6. Post-processing: `b028cac`.
-- [x] 7. Results script and figure: `811ca25`. D7 with tallies: 2.82 s vs
+- [x] 5. Tally regression and D7 reference: `d72e2fb`. Recorded once at
+      `68794ee` with a clean tree; 1033 KiB compressed.
+- [x] 6. Post-processing: `b7acd90`.
+- [x] 7. Results script and figure: `42756b4`. D7 with tallies: 2.82 s vs
       2.18 s without (+29%, warm, incl. packing).
 - [x] 8. Part A docs: README (results, 14.1 MeV response table, data notes,
       Part A limitations), deviations 13-14 and the mirrored scoring path.
-- [x] 9. Li-6 molar density: `d4e5fc8`. Natural path unchanged bit for
+- [x] 9. Li-6 molar density: `aca5343`. Natural path unchanged bit for
       bit; all regressions byte-exact.
-- [x] 10. Reflective boundary: `2e367d7`. Folding test (4 checks): flux
+- [x] 10. Reflective boundary: `fbade93`. Folding test (4 checks): flux
       +0.33, absorption +2.53, leakage -2.51, tritium +0.08 SE, all within
       3 SE (absorption and leakage are nearly one fluctuation, their sum
       being fixed by the balance). `kin_d7_reflect` recorded once in its
       own file (1050 KiB); `kin_d7` untouched (record refuses an existing
-      reference). Its manifest shows `git_dirty` true at `d4e5fc8`: the
+      reference). Its manifest shows `git_dirty` true at `aca5343`: the
       uncommitted changes were exactly those committed with it. 194 tests
       pass.
-- [x] 11. Sweep: `e28d744`. About 100 s; the CSV reproduces byte for byte.
+- [x] 11. Sweep: `cc0bb22`. About 100 s; the CSV reproduces byte for byte.
       Reflective D7 results added to `docs/phase3_results.json`.
 - [x] 12. Part B docs: README (Part B scope, reflective D7 table, sweep
       table and figure, tests, limitations), deviation 15, this status.
@@ -524,7 +524,11 @@ the track-length Li-7 tritium.
   - `record` refuses to overwrite an existing reference without
     `--overwrite`.
   - kin_d7_reflect was recorded with this commit's changes uncommitted
-    (`git_dirty` true), to keep the 12-commit structure.
+    (`git_dirty` true), to keep the 12-commit structure. Its manifest
+    names the parent, `aca5343`, which has no `reflect_left`, so a clean
+    tree at that commit cannot reproduce the reference; the flag is kept
+    as recorded. The code is in `fbade93`, and on a clean tree at
+    `076c587` the tally compare reproduces all 12 arrays byte-for-byte.
   - The reflective D7 problem uses seed 20261035, as the seeds table
     fixes. It therefore shares its histories with the sweep's 20 cm
     natural point, and its tritium value is identical.

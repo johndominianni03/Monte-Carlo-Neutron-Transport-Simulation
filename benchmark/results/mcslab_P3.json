@@ -667,7 +667,7 @@
   }
  },
  "provenance": {
-  "git_commit": "b64ef67ba93f82b8ecd44f843241610827ef7cd6",
+  "git_commit": "108e9510022fa246dce97142a9c7d1dfc11b813b",
   "code_dirty": false,
   "code_sha256": "ca6a0c7a51722204613dde0ab9b3e6008e3541047841247ac0dddbb4acf1f442",
   "code_files": ["mcslab/__init__.py", "mcslab/__main__.py", "mcslab/ce_materials.py", "mcslab/collision.py", "mcslab/config.py", "mcslab/config_ce.py", "mcslab/config_kin.py", "mcslab/depth_mesh.py", "mcslab/distributions.py", "mcslab/geometry.py", "mcslab/materials.py", "mcslab/nucdata.py", "mcslab/postprocess.py", "mcslab/responses.py", "mcslab/rng.py", "mcslab/sources.py", "mcslab/synthetic.py", "mcslab/tallies.py", "mcslab/tracks.py", "mcslab/transport.py", "mcslab/transport_ce.py", "mcslab/transport_kin.py", "mcslab/xs.py", "benchmark/__init__.py", "benchmark/jsonio.py", "benchmark/run_mcslab.py"],

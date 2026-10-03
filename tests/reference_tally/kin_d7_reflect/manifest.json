@@ -1,7 +1,7 @@
 {
   "reason": "Initial Phase 3 Part B reference (problem kin_d7_reflect): D7 slab with a reflective plasma side (reflect_left, approved D17), seed 20261035, 20 x 5000, depth bins W 10 / FLiBe 20 / Fe 20, 20-per-decade spectrum grid; all transport arrays plus tally, mesh_flux and reflected_weight pinned. Recorded once, in its own file (kin_d7 untouched). git_dirty is true because the working tree held exactly the reflective-boundary changes committed together with this reference.",
   "recorded_utc": "2026-10-03T18:55:11+00:00",
-  "git_commit": "d4e5fc8b3742ee71d85d78d52682fc3bdf985e5d",
+  "git_commit": "aca5343076aa1bf4fad9e84da1d26c8341ea5f87",
   "git_dirty": true,
   "environment": {
     "python": "3.9.6",

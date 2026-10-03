@@ -1,7 +1,7 @@
 {
   "reason": "Initial Phase 3 tally reference (problem kin_d7): D7 as in tests/test_regression_kin.py (W 0.5 / FLiBe 20 / Fe 10 cm, 14.1 MeV beam, 20 x 5000, seed 20261023) with depth bins W 10 / FLiBe 20 / Fe 20 and the 20-per-decade spectrum grid; responses MT 301, 901, 444, 205, 207 and absorption, estimators track length, collision and their uncollided forms; recorded once, after checks 1-5 passed (80 statistical checks, largest |n_SE| 2.15)",
   "recorded_utc": "2026-10-03T18:43:59+00:00",
-  "git_commit": "ad15aef8790fc37301ba9138717fdbda7bd61b65",
+  "git_commit": "68794ee5068b07a474870eaaad17f6a154759518",
   "git_dirty": false,
   "environment": {
     "python": "3.9.6",
