@@ -423,6 +423,18 @@ including packing; OpenMC 10 s (P1), 15.5 s (P3), 5.1 s (P4), plus about
       limitations); deviations 2, 9 and 14 measured, new deviation 17;
       this status and the final summary.
 
+**As run** (where the runs differ from the text of this plan):
+- The matched energy cutoff (D28, "1e-5 eV") is 9.999999999999999e-06 eV,
+  one ulp below 1e-5. It is mcslab's default, the largest data-grid
+  minimum of the nuclides as stored in the files
+  (`config_kin._energy_cutoff`), and it reaches OpenMC unchanged through
+  `benchmark/problems.json`.
+- `benchmark/jsonio.py` (standard library only) was added, a file the plan
+  did not list, so that both environments write identical JSON text.
+- The palette validator did not run (no Node.js). The figures use slots 1
+  and 2 of the reference palette, which is documented as validated for its
+  first three slots; no local validation was made.
+
 ## Final summary (2026-10-03)
 
 - **Protocol exceptions: none.** No primary check exceeded 3 SE, so the
