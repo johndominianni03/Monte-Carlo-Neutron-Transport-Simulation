@@ -1,7 +1,7 @@
 """Phase 2b Part 2: secondary-neutron laws on real ENDF/B-VIII.0 data.
 
 Seeds were fixed in docs/phase2b_plan.md before any of these tests existed
-(project conventions: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
+(docs/development.md: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
 chi-square tests; "exact" = integer identities or round-off with a stated
 bound.
 

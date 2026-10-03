@@ -1,7 +1,7 @@
 """Phase 2b Part 1 validation: collision kinematics and the kinematic kernel.
 
 Seeds were fixed in docs/phase2b_plan.md before any of these tests existed
-(project conventions: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
+(docs/development.md: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
 chi-square and Hotelling tests (the false-alarm rate of a two-sided 3-sigma
 check); "exact" = integer identities on raw sums (all weights are 1.0) or
 round-off with a stated bound.

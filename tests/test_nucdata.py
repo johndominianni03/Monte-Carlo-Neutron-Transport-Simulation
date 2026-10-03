@@ -27,7 +27,7 @@ What each test covers, and what it doesn't:
   Plus: the data files match the pinned checksums, and the material number
   densities agree with IUPAC standard atomic weights.
 
-The seed for (d) was fixed before the first run (project conventions: no seed-shopping).
+The seed for (d) was fixed before the first run (docs/development.md: no seed-shopping).
 """
 import math
 import os

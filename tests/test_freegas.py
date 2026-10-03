@@ -1,7 +1,7 @@
 """Phase 2b Part 2: free-gas target motion and per-material temperature.
 
 Seeds were fixed in docs/phase2b_plan.md before any of these tests existed
-(project conventions: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
+(docs/development.md: no seed-shopping). Acceptance: 3 SE for means; p >= 0.0027 for
 chi-square tests; exact = bit identity or a stated round-off bound.
 
 Physics under test (OpenMC v0.16.0 src/physics.cpp sample_target_velocity,

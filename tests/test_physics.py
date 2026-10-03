@@ -6,7 +6,7 @@ identities on raw weight sums (weights are exactly 1.0, so the sums are exact
 integers in float64) and must hold with no tolerance.
 
 Seeds are fixed and were chosen before the first run. Do NOT change a seed
-or an expected value to make a check pass (project conventions). With 35
+or an expected value to make a check pass (docs/development.md). With 35
 statistical checks at 3 sigma (two-sided p = 0.27% each), the chance that at
 least one genuine fluctuation exceeds 3 sigma is roughly 9% if they were
 independent; that would be a finding to report, not a reason to reseed.
