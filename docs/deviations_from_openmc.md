@@ -5,12 +5,20 @@ physics wherever it can. This file lists every place where it knowingly
 does not.
 
 The reference is **OpenMC v0.16.0** (tag `v0.16.0`, released 2026-08-05),
-read from source. File paths are relative to the OpenMC repository. The
-`openmc` package itself is never installed or imported.
+read from source. File paths are relative to the OpenMC repository.
+mcslab never imports the `openmc` package. For the Phase 4 benchmark,
+OpenMC 0.16.0 is installed in its own environment and run by
+`benchmark/run_openmc.py` only.
 
-Status: Phase 3. Every secondary law in the W / FLiBe / Fe data is
-implemented, plus free-gas target motion, per-material temperature and
-the response tallies (heating, damage, gas production).
+Status: Phase 4.
+- **Implemented:** every secondary law in the W / FLiBe / Fe data,
+  free-gas target motion, per-material temperature and the response
+  tallies (heating, damage, gas production).
+- **Benchmarked** against OpenMC 0.16.0 on four problems with the same data
+  and like-for-like settings (`docs/phase4_plan.md`; README, "Phase 4"):
+  all 82 pre-declared 3 SE checks pass (largest |z| 2.63). The
+  differences found are listed below (deviations 14, 16 and 17); none is
+  a physics difference.
 
 ## What is mirrored (for orientation)
 
@@ -169,6 +177,19 @@ These follow OpenMC's algorithm and random-number order:
   - **Problem D7** (W / FLiBe / Fe, 14.1 MeV, 1e5 histories): 0 cut off.
 - **Effect on Phase 4:** about 1e-4 of the source in a hydrogenous
   moderator, and none in the fusion problems so far.
+- **Measured in Phase 4:**
+  - **Matched in the benchmark.** OpenMC's neutron cutoff was set to
+    mcslab's, 9.999999999999999e-06 eV. That is the grid minimum, one ulp
+    below 1e-5.
+  - **Weight at the cutoff.** In the benchmark's hydrogen slab (P4,
+    1e6 histories), mcslab ended 2.5e-4 neutrons per source at the
+    cutoff. In P1-P3 it ended none.
+  - **OpenMC at its default cutoff of 0** (diagnostic run on P4): results
+    changed by at most 0.40% (absorption, 2.5 SE between two independent
+    runs). The cutoff alone can change absorption by at most about
+    0.044%, so most of that change is noise.
+  - **Still agrees.** Against mcslab, all 7 P4 checks pass with OpenMC's
+    default (largest |z| 1.87).
 
 ### 3. Target motion: two additions to OpenMC's rule
 
@@ -284,8 +305,19 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
     (5-100 keV).
   - Target motion is not affected, because the URR lies far above
     400 kT.
-  - For Phase 4, run OpenMC with `urr_ptables_on = False` for a
-    like-for-like comparison, or quantify the difference.
+- **Measured in Phase 4.** The benchmark ran OpenMC with
+  `ptables = False`. One diagnostic run on D7 (P1) with the tables on
+  shows:
+  - **Largest change:** W absorption, -0.92% (1.2 SE between two
+    independent runs).
+  - **Left leakage:** +0.59% (3.6 SE). With the W absorption, the
+    expected direction for self-shielding of W's resonances.
+  - **Noise of the same size:** the Li-7, F-19 and Be-9 tritium, which
+    the tables cannot affect (thresholds above 3 MeV), moved by 2.7-3.4 SE.
+  - **Still agrees.** Against mcslab, the run with the tables still passes
+    all 26 checks (largest |z| 2.47).
+  - **Effect on D7:** a few tenths of a percent, not resolved more finely
+    by one run.
 
 ### 10. Slab geometry with a 3D direction
 
@@ -348,6 +380,18 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
   2.9e-16 of the flight length against exact arithmetic). Tracks shorter
   than about 2e-8 cm may be attributed differently; that has no
   statistical effect.
+- **Found in Phase 4: OpenMC's mesh tallies leak slivers across layer
+  boundaries.**
+  - **What:** OpenMC can put a round-off sliver of a FLiBe track into
+    the last W bin, presumably because a surface crossing ends a track at
+    the boundary only up to round-off (the mechanism was not traced in
+    the source). Example: 5.4e-19 tritons per source in the W bin next
+    to the FLiBe, where W has no tritium data.
+  - **How large:** at most 1.2e-13 of the nuclide's largest bin value in
+    the benchmark. OpenMC's mesh sums equal its cell tallies to 5.9e-10.
+  - **mcslab:** its bins tile each layer exactly, so it has no slivers.
+  - **Consequence:** the benchmark checks exact zeros on per-layer cell
+    tallies.
 
 ### 15. Reflective boundary (Phase 3 Part B; round-off and bookkeeping only)
 
@@ -392,3 +436,26 @@ The rule itself is OpenMC's (see "What is mirrored"). mcslab adds:
   compares that.
 - **Effect:** none on any other tally; the difference is in what the
   uncollided diagnostic means.
+
+### 17. Energy exactly on a bin edge (spectrum tallies; found in Phase 4)
+
+- **OpenMC** (`src/tallies/filter_energy.cpp`, `EnergyFilter::get_all_bins`,
+  with `lower_bound_index` from `include/openmc/search.h`):
+  - an energy equal to an interior edge e_k goes to the bin *below* it,
+    (e_{k-1}, e_k]; bins are closed on the right
+  - the lowest edge belongs to the first bin, and the top edge is included
+- **mcslab** (`mcslab/transport_kin.py`, `energy_bin`):
+  - bins are [e_k, e_{k+1}), closed on the left, so an energy on an
+    interior edge goes to the bin *above* it
+  - the top edge is excluded
+- **Effect:** only for energies exactly on an edge.
+  - The benchmark's P4 source, 1 MeV, is exactly the edge 10^6 eV of the
+    20-per-decade grid. Its uncollided neutrons land one bin apart in the
+    two codes (per-bin |z| of 836 and 949). The two bins merged agree,
+    z = +1.59.
+  - P1-P3 (14.1 MeV) are not affected.
+  - Scattered neutrons reach an exact edge with probability zero.
+- **Why mcslab keeps its convention:** changing it would change mcslab's
+  spectrum tallies, and so the byte-exact references, for a difference
+  that is a pure convention. A source energy exactly on an edge is
+  reported in the comparison rather than redefined.

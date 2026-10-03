@@ -171,6 +171,18 @@ Phase 1 and Phase 2a kernels are unchanged.
   over FLiBe thickness x Li-6 enrichment with the reflective plasma side
   (`docs/blanket_sweep.csv`, `docs/figures/blanket_sweep.png`).
 
+### Phase 4: benchmark against OpenMC 0.16.0
+
+- **Benchmark.** mcslab and OpenMC 0.16.0 run the same four problems with
+  the same data, densities, meshes and like-for-like settings, 1e6
+  histories each. Pre-declared 3 SE checks compare the results (results
+  below).
+- **Two sides, files only.** `benchmark/run_mcslab.py` (mcslab's venv) and
+  `benchmark/run_openmc.py` (OpenMC's own environment) exchange only
+  `benchmark/problems.json` and results JSON.
+- **Checks.** `benchmark/compare.py` applies the checks with numpy alone,
+  so the comparison runs without OpenMC installed.
+
 `docs/deviations_from_openmc.md` lists every known difference from OpenMC.
 
 ## Nuclear data setup
@@ -203,6 +215,7 @@ tests skip and the Phase 1 tests run as before.
 ./venv/bin/python tests/test_regression_tally.py compare   # Phase 3 response-tally bit-identical regression
 ./venv/bin/python scripts/phase3_results.py                # D7 results -> docs/phase3_results.json, figure
 ./venv/bin/python scripts/blanket_sweep.py                 # Part B sweep -> docs/blanket_sweep.csv, figure (~2 min)
+./venv/bin/python benchmark/compare.py --figures           # Phase 4: mcslab vs OpenMC checks, figures
 ```
 
 A kinematic run (Phase 2b), e.g. a synthetic scatterer:
@@ -354,6 +367,296 @@ Tritium per source neutron (mean +- SE):
 - **The plateau** is about 1.23 per source neutron for natural to 40%
   Li-6. A real blanket loses neutrons to structure, ports and gaps, so it
   would breed less.
+
+## Phase 4: benchmark against OpenMC 0.16.0
+
+**Question.** Do mcslab and OpenMC give the same answers on the same
+problems with the same nuclear data? The checks, seeds and settings were
+fixed in `docs/phase4_plan.md` before any benchmark run. This is a
+code-to-code verification: both codes read the same 14 ENDF/B-VIII.0
+files, so agreement shows that the transport and tallies are implemented
+the same way, not that the data match experiment.
+
+**Answer.** Yes, within the statistics:
+- All 82 primary checks pass: largest |z| 2.63, no check beyond 3 SE.
+- Every exact check passes.
+- No physics difference was found.
+- The differences found are definitions and conventions (listed below),
+  not physics.
+
+### Setup
+
+- **OpenMC** 0.16.0 (the v0.16.0 tag, commit `617d35a5`), an osx-64 build
+  running under Rosetta, in its own environment, on one thread.
+  `benchmark/run_openmc.py` builds the model from `benchmark/problems.json`
+  and never imports mcslab. mcslab's venv never imports openmc; the two
+  sides exchange JSON files only. **No speed comparison is made**: OpenMC
+  runs emulated here.
+- **The same inputs, checked bit for bit.** Both result files of a problem
+  carry the sha256 of the problem file and of the data, and the pytest
+  checks them:
+  - the same data files
+  - the same per-nuclide atom densities (mcslab's kernel arrays, read back
+    from OpenMC's `summary.h5`)
+  - the same 50-80 depth-bin edges and the same 246-bin spectrum grid
+- **Like-for-like settings.** Each is set explicitly and recorded in the
+  results:
+  - unresolved-resonance probability tables off (mcslab uses the smooth
+    average cross sections)
+  - photon transport off; survival biasing off, so there is no roulette at
+    all
+  - the same energy cutoff: the grid minimum, 9.999999999999999e-06 eV
+  - OpenMC's nearest-temperature rule: W, Fe and H take 294 K data, FLiBe
+    900 K data, so both codes use the same kT for free-gas scattering
+  - free-gas threshold 400 kT
+  - track-length estimators everywhere
+- **OpenMC's model of a 1D slab.**
+  - x-planes at the layer bounds.
+  - Mirrors at y, z = +-10 m, which make the slab infinite sideways. A
+    mirror changes neither the x-motion nor any path length, so OpenMC's
+    per-source tallies equal mcslab's with no area factor.
+  - A thin empty buffer cell left of x = 0. OpenMC checks that a source
+    point is inside the geometry by pretending the neutron points along
+    +z, which puts a point exactly on the x = 0 plane outside. The buffer
+    gives that check somewhere to land. The neutron itself is then placed
+    with its real direction, +x, so it starts in W at exactly x = 0, as
+    in mcslab. With a mirror at x = 0, the buffer is never entered.
+- **Problems** (100 batches x 10,000 histories in each code):
+
+  | | geometry | plasma side | source |
+  |---|---|---|---|
+  | P1 | D7: W 0.5 \| FLiBe 20 \| Fe 10 cm | vacuum | 14.1 MeV beam |
+  | P2 | D7 | reflective | 14.1 MeV beam |
+  | P3 | W 0.5 \| FLiBe 100 \| Fe 10 cm | reflective | 14.1 MeV beam |
+  | P4 | H-1, 0.0708 g/cm^3, 30 cm (free gas at every energy) | vacuum | 1 MeV beam |
+
+- **Statistics.**
+  - Each check is z = (mcslab - OpenMC) / sqrt(SE_m^2 + SE_o^2): the gap
+    between the codes in units of its combined uncertainty. A check fails
+    at |z| > 3, which chance alone gives about once in 370.
+  - With 82 checks, the chance that at least one fails by luck is about
+    20%. That is why a failure would have triggered one rerun at 4x the
+    histories on a second, pre-declared seed pair. It was not needed.
+  - The two codes use different random-number generators (deviation 6),
+    so they cannot share random numbers whatever the seeds.
+
+### Results
+
+Primary checks, layer-integrated (`benchmark/results/comparison.json`
+holds every value):
+
+| problem | primary checks | beyond 3 SE | largest \|z\| | mean z | exact checks |
+|---|---|---|---|---|---|
+| P1 | 26 | 0 | 2.63 | +0.89 | 16/16 pass |
+| P2 | 25 | 0 | 2.05 | -0.77 | 17/17 pass |
+| P3 | 24 | 0 | 1.52 | +0.68 | 17/17 pass |
+| P4 | 7 | 0 | 1.21 | +0.53 | 16/16 pass |
+
+z per check (a score is the material total of the layer):
+
+| check | P1 | P2 | P3 |
+|---|---|---|---|
+| W flux | +2.05 | -0.95 | +0.82 |
+| W absorption | +0.85 | +0.40 | +0.32 |
+| W heating 301 | +1.13 | -0.01 | -0.74 |
+| W heating-local 901 | +1.13 | +0.42 | -0.01 |
+| W damage-energy 444 | +1.94 | -0.63 | -0.41 |
+| W He4 207 | -0.52 | -0.80 | +0.08 |
+| FLiBe flux | +0.69 | -0.42 | +1.11 |
+| FLiBe absorption | +0.94 | -0.95 | +1.23 |
+| FLiBe heating 301 | -0.01 | -1.92 | +1.40 |
+| FLiBe heating-local 901 | -0.01 | -1.99 | +1.33 |
+| FLiBe damage-energy 444 | +1.22 | -0.83 | +0.25 |
+| FLiBe He4 207 | -0.11 | -1.91 | +1.52 |
+| FLiBe H3 205 | +0.85 | -0.97 | +1.33 |
+| FLiBe H3 205, Li-6 | +1.07 | -0.70 | +1.15 |
+| FLiBe H3 205, Li-7 | -0.79 | -2.05 | +1.31 |
+| FLiBe H3 205, Be-9 | -0.40 | -1.15 | +0.63 |
+| FLiBe H3 205, F-19 | -0.80 | -1.23 | +0.80 |
+| Fe flux | -0.42 | +0.34 | +0.42 (weakest) |
+| Fe absorption | +1.17 | +1.73 | +0.94 (weakest) |
+| Fe heating 301 | +2.47 | -1.02 | +0.39 (weakest) |
+| Fe heating-local 901 | +2.31 | -0.60 | +0.66 (weakest) |
+| Fe damage-energy 444 | +1.45 | -0.37 | +0.43 (weakest) |
+| Fe He4 207 | +2.63 | -1.13 | +0.38 (weakest) |
+| Fe H3 205 | +2.29 | -0.76 | +0.83 (diagnostic only) |
+| leakage left | +2.10 | exactly 0 in both | exactly 0 in both |
+| leakage right | -0.22 | -1.62 | +1.05 |
+
+P4 (H-1 slab): flux +0.79, absorption +0.84, heating 301 +1.12,
+heating-local 901 +1.21, damage energy 444 +0.03, leakage left -0.10,
+right -0.17. H-1 has no MT 205 or 207 data, so both codes score exactly 0
+there (exact check), as they do for W tritium.
+
+Selected values per source neutron (mean +- SE):
+
+| quantity | problem | mcslab | OpenMC | mcslab / OpenMC |
+|---|---|---|---|---|
+| FLiBe tritium | P1 | 0.29905 +- 0.00043 | 0.29852 +- 0.00046 | 1.0018 |
+| FLiBe tritium | P2 | 0.67976 +- 0.00080 | 0.68097 +- 0.00095 | 0.9982 |
+| FLiBe tritium | P3 | 1.2289 +- 0.0012 | 1.2266 +- 0.0012 | 1.0018 |
+| W damage energy (eV) | P1 | 4279 +- 3.2 | 4270 +- 3.3 | 1.0021 |
+| FLiBe heating 301 (eV) | P1 | 5.9412e6 +- 4.1e3 | 5.9412e6 +- 3.9e3 | 1.0000 |
+| right leakage | P2 | 0.46713 +- 0.00060 | 0.46837 +- 0.00049 | 0.9973 |
+| H absorption | P4 | 0.57202 +- 0.00074 | 0.57120 +- 0.00063 | 1.0014 |
+
+- **Resolution.**
+  - 74 of the 82 checks have a combined relative SE below 0.5% (median
+    0.16%).
+  - Among them, the largest gap is P1's Fe tritium: +0.86% (2.3 SE).
+  - Typically, a difference of about 0.5% would have been detected.
+- **The weakest checks** are P3's Fe layer, behind 100 cm of FLiBe: few
+  neutrons reach it (relative SE 3.5-12%). P3's Fe tritium has about 70
+  contributing histories. It was moved to the diagnostics before the run
+  (plan D38): z +0.83.
+
+![mcslab / OpenMC per depth bin, P1](docs/figures/phase4_ratio_P1.png)
+
+Ratio figures for the other problems: `docs/figures/phase4_ratio_P2.png`,
+`_P3.png`, `_P4.png`. Spectra of both codes per layer, with their ratio:
+`docs/figures/phase4_spectra_P{1-4}.png`.
+
+![Per-bin z distributions](docs/figures/phase4_z.png)
+
+### What differs, and why
+
+None of these is a physics difference.
+
+- **Run-wide fluctuations move many bins together** (per-bin
+  diagnostics: 2055-3012 z values per fusion problem, no pass/fail).
+  - Neighbouring bins share histories. One fluctuation, such as a few more
+    fast neutrons reaching the Fe, moves every fast-neutron quantity of
+    every Fe isotope in every Fe bin in the same direction.
+  - In P1, the Fe layer's fast-neutron scores sit about +2 SE high per bin.
+    The plasma-side region is +2 to +3.5 SE high (W flux, left leakage, the
+    first FLiBe bins; largest per-bin |z| 4.33).
+  - So 13.4% of P1's per-bin z values exceed 2, against 4.6% for
+    independent normal noise.
+  - P2 has the same slab, independent seeds and the opposite sign in the
+    Fe (-0.7 to -0.9 SE per bin). Pooling P1 and P2 for Fe He-4 gives
+    +1.1 SE.
+  - P4 has the other vacuum plasma side, and its left leakage is at
+    -0.10 SE.
+  - P2, P3 and P4 have 3.3%, 1.3% and 6.7% of per-bin z beyond 2.
+  - Any real difference at P1's plasma side is below about 0.8% (the
+    observed +0.33% in W flux plus 3 SE).
+- **"Uncollided" means different things** (deviation 16).
+  - OpenMC 0.16.0 gives neutrons banked by (n,2n)-type reactions a
+    collision count of 0. Its `CollisionFilter` bin 0 therefore also holds
+    their first flights: 11-19% extra in W and FLiBe, and 80% in D7's Fe.
+  - Restricted to the source energy, OpenMC's uncollided flux matches
+    mcslab's and the first-flight formula. Largest |z| against the
+    formula per bin: 2.1 (mcslab) and 2.7 (OpenMC) in P1, P2 and P4.
+  - P3 is the exception, for lack of events in its deep Fe. The largest
+    |z| there is 2.1 (mcslab) and 3.4 (OpenMC, in bins with a handful of
+    events). OpenMC scored no uncollided neutron in 11 Fe bins, where the
+    formula expects 1.1e-6 cm of track per source neutron in all, about
+    one neutron in the whole run.
+- **An energy exactly on a spectrum-bin edge is binned differently**
+  (deviation 17).
+  - OpenMC puts it in the bin below the edge, mcslab in the bin above.
+  - P4's 1 MeV source sits exactly on the grid edge 10^6 eV, so its
+    uncollided neutrons land one bin apart in the two codes (|z| 836 and
+    949).
+  - The two bins merged agree: z = +1.59. This was found after the run;
+    those two bins are reported separately and kept out of the per-bin
+    statistics.
+- **Mesh slivers** (deviation 14). OpenMC's mesh puts round-off slivers of
+  a track (at most 1.2e-13 of the nuclide's largest bin) into the
+  neighbouring layer. That is
+  why the exact zeros (W tritium) are checked on per-layer cell tallies.
+  OpenMC's mesh sums equal its cell tallies to 5.9e-10.
+- **Fractional yields** (deviation 5). OpenMC changes the neutron's weight;
+  mcslab samples whole neutrons. Same averages, different noise.
+
+### What OpenMC's default settings would change (plan D37)
+
+Two extra OpenMC runs each changed one like-for-like setting back to
+OpenMC's default. They are compared with the main OpenMC run, two
+independent runs, so each change carries the noise of both. These are
+diagnostics, not checks.
+
+**Probability tables on** (P1; the tables exist only for W-182 to W-186
+at 5-100 keV and Fe-58 at 0.35-3 MeV):
+
+| quantity | change | in SE | z against mcslab |
+|---|---|---|---|
+| W absorption | -0.92% | -1.21 | +2.02 |
+| left leakage | +0.59% | +3.58 | -1.52 |
+| Fe flux | -0.52% | -2.23 | +1.82 |
+| right leakage | -0.43% | -2.16 | +1.80 |
+| FLiBe tritium, Li-7 | -0.36% | -3.40 | +2.45 |
+| FLiBe tritium, F-19 | -0.33% | -3.32 | +2.47 |
+| FLiBe tritium, Be-9 | -0.27% | -2.72 | +2.25 |
+| W damage energy 444 | +0.25% | +2.35 | -0.43 |
+| the other 18 quantities | at most 0.40% | within 2 SE | within 2.3 |
+
+- **The largest change is W absorption, -0.92% (1.2 SE).** Less
+  absorption in W and a higher left leakage (+0.59%, 3.6 SE) go in the
+  expected direction: the tables self-shield W's resonances, so more keV
+  neutrons get through the W. The W change alone is only 1.2 SE.
+- **Some changes are noise, not physics.**
+  - The tables cannot change the Li-7, F-19 and Be-9 tritium. Those
+    reactions need neutrons above 3.1, 9.5 and 11.6 MeV, and the tables
+    act below 3 MeV.
+  - So their -2.7 to -3.4 SE moves are a fluctuation between the two
+    independent runs. The three are one fluctuation, since all follow the
+    fast flux in the FLiBe.
+  - This is an example of why a single 3 SE excursion triggers a rerun,
+    not a verdict.
+- **Against mcslab**, the run with the tables still passes all 26 checks
+  (largest |z| 2.47). Its mean z is +1.20, against +0.89 for the main
+  pair.
+- **Conclusion:** in D7 the tables matter at the level of a few tenths of
+  a percent, mostly in W absorption and the plasma-side leakage. One run
+  does not resolve it more finely.
+
+**Energy cutoff 0** (P4; OpenMC transports neutrons below 1e-5 eV on
+extrapolated cross sections):
+
+| quantity | change | in SE | z against mcslab |
+|---|---|---|---|
+| H absorption | +0.40% | +2.49 | -1.50 |
+| H flux | +0.22% | +2.04 | -1.16 |
+| H heating-local 901 | +0.20% | +1.97 | -0.68 |
+| H heating 301 | -0.06% | -0.66 | +1.87 |
+| H damage energy 444 | +0.03% | +0.46 | -0.44 |
+| left leakage | -0.09% | -0.41 | +0.30 |
+| right leakage | -0.11% | -0.32 | +0.13 |
+
+- **The cutoff's real effect is too small to see.** In the main runs,
+  mcslab ended 2.5e-4 neutrons per source at the cutoff. Even if every
+  one of them were absorbed instead, absorption would rise by only 0.044%.
+- **So the changes above are mostly noise between the two runs** (at most
+  2.5 SE).
+- **Against mcslab,** all 7 checks still pass (largest |z| 1.87).
+- **Neither fusion problem is affected:** no weight reached the cutoff in
+  P1-P3.
+
+### Reproducing
+
+```bash
+# mcslab side (venv): the problem file, then the four problems (~2.5 min)
+MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python benchmark/run_mcslab.py export
+MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python benchmark/run_mcslab.py run
+# OpenMC side (its own environment; one thread; about 16 min of CPU in all)
+MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 <openmc-env>/bin/python benchmark/run_openmc.py run
+MCSLAB_DATA=... <openmc-env>/bin/python benchmark/run_openmc.py run --problem P1 --variant ptables_on
+MCSLAB_DATA=... <openmc-env>/bin/python benchmark/run_openmc.py run --problem P4 --variant cutoff_0
+# comparison (numpy only) and figures
+./venv/bin/python benchmark/compare.py --figures
+./venv/bin/python -m pytest tests/test_benchmark_openmc.py
+```
+
+- **Rerunning reproduces the committed results exactly.**
+  - mcslab: `run_mcslab.py check --problem P1` reruns one problem and
+    compares everything but the provenance byte for byte.
+  - OpenMC: on the same build and one thread, a rerun reproduces its JSON
+    byte for byte (checked for P4). Threads would change the last bits of
+    OpenMC's tally sums.
+- **Nothing local is committed.** Run directories, statepoints, XML and
+  logs stay outside the repository. The committed JSON holds no absolute
+  paths, user names, dates or timings.
 
 ## Tests: what they do and do not cover
 
@@ -552,6 +855,27 @@ the tests were written):
       the neutron balance.
   - **Not covered:** an albedo below 1, a reflective right side, and any
     comparison of the sweep with another code.
+
+- `tests/test_benchmark_openmc.py` (Phase 4; reads the committed results,
+  runs no transport, needs no data or OpenMC; under 1 s):
+  - **Exact, per problem:**
+    - identical inputs in both codes: the problem file, data sha256
+      against `scripts/checksums`, atom densities and mesh and spectrum
+      edges bit for bit
+    - the declared OpenMC version, commit and settings, seeds and sizes
+    - exact zeros in both codes (W tritium, left leakage with a mirror,
+      H-1 tritium and helium)
+    - mcslab's exact balance; nothing lost in either code
+  - **Exact, repository-wide:** no local path or user name in a committed
+    benchmark file; `compare.py` imports numpy only.
+  - **Statistical:** the 82 primary checks, |z| <= 3. All pass, largest
+    2.63.
+  - **Exceptions table:** `PROTOCOL_EXCEPTIONS` names any check that
+    passed only on the failure protocol's 4x rerun. It is empty.
+  - **Not covered (reported by `compare.py`, no pass/fail):**
+    - the per-bin, spectrum and uncollided diagnostics
+    - the default-settings runs
+    - agreement with experiment
 
 ## Hand-checking cross sections against an independent source
 
@@ -766,9 +1090,10 @@ Dividing an eV-b value by sigma_t gives eV per collision.
   self-shielding in the keV-MeV range.
 - **Statistics.** README standard errors come from 20 batches. The
   validation tests use 100.
-- **Not yet validated against OpenMC or experiment** (Phase 4). The tests
-  show that the tallies score the data consistently and reproducibly, not
-  that the data or the transport are right.
+- **Not validated against experiment.** The tests show that the tallies
+  score the data consistently and reproducibly. Phase 4 shows that they
+  agree with OpenMC on the same data. Neither shows that the data are
+  right.
 
 ### Phase 3, Part B
 - **The reflective plane is an idealisation.** It returns every neutron
@@ -784,3 +1109,25 @@ Dividing an eV-b value by sigma_t gives eV per collision.
 - **Enriched FLiBe density:** the molar density is held at the natural-Li
   Janz value. That is an assumption; no density data for enriched FLiBe
   were used.
+
+### Phase 4
+- **Same data on both sides.** The benchmark verifies the transport and
+  tally code, not the nuclear data. A shared data error would not show.
+- **Like-for-like, not default, OpenMC.** OpenMC ran with probability
+  tables off and mcslab's energy cutoff. Its defaults move D7 results by a
+  few tenths of a percent (probability tables; see the Phase 4 results)
+  and are not what mcslab computes.
+- **Resolution.** About 0.5% for most quantities (1e6 histories per code),
+  far worse in P3's Fe layer (3.5-12%). Smaller differences, such as the
+  5e-7 level-kinematics deviation, are not tested.
+- **One build.** OpenMC 0.16.0 only, an osx-64 build under Rosetta on one
+  machine. The results reproduce byte for byte on that build with one
+  thread; another build or platform may differ in the last bits.
+- **Not covered:**
+  - surface currents at a mirror (both codes give 0 net current there, by
+    different bookkeeping; deviation 15)
+  - isotropic sources
+  - any problem with an S(alpha,beta) table, fission or photons
+- **Statistical checks.** The 82 checks share histories within a problem,
+  so they are positively correlated. The 20% false-alarm figure is an
+  upper bound.

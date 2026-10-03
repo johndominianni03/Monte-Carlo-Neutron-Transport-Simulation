@@ -395,12 +395,110 @@ including packing; OpenMC 10 s (P1), 15.5 s (P3), 5.1 s (P4), plus about
 
 ## Status
 
-- [x] `main` fast-forwarded to `phase-3`; branch `phase-4` created.
+- [x] `main` fast-forwarded to `phase-3` (`fd30387`); branch `phase-4`
+      created.
 - [x] Plan approved (2026-10-03).
-- [ ] 1. Plan.
-- [ ] 2. Corrections to Phase 3 statements.
-- [ ] 3. mcslab side and problem file.
-- [ ] 4. OpenMC side.
-- [ ] 5. Comparison, pytest and results.
-- [ ] 6. Figures.
-- [ ] 7. Documentation and final summary.
+- [x] 1. Plan: `e45345a`.
+- [x] 2. Corrections to Phase 3 statements: `88edd23`. New deviation 16
+      (uncollided estimators), deviation 6 rewritten (generators), README
+      and a comment in `mcslab/tallies.py`. All five regressions byte
+      exact; 194 tests pass.
+- [x] 3. mcslab side and problem file: `27ca6e1`. The kernel's densities
+      equal `CEMaterial.number_densities` and the D7 tally manifest bit
+      for bit. A shared writer, `benchmark/jsonio.py` (standard library
+      only), was added so both environments write identical JSON text.
+- [x] 4. OpenMC side: `b64ef67`. Development check on seed 20261199
+      (P1, 2 x 1000): densities, mesh and spectrum edges read back
+      bit-identical, settings as declared in `model.xml`, no lost
+      particle, no local path.
+- [x] 5. Comparison, pytest and results: `de7ef56`. `compare.py` and the
+      pytest were written before the benchmark runs. All 82 primary
+      checks pass; the failure protocol was not needed. The commit was
+      amended once before any push (from `c53fc12`): the test for local
+      paths matched its own pattern once the file was tracked, and the
+      pattern is now assembled at run time.
+- [x] 6. Figures: `342eb1d`.
+- [x] 7. Documentation: README Phase 4 section (setup, results, what
+      differs and why, the default-settings numbers, reproduction, tests,
+      limitations); deviations 2, 9 and 14 measured, new deviation 17;
+      this status and the final summary.
+
+## Final summary (2026-10-03)
+
+- **Protocol exceptions: none.** No primary check exceeded 3 SE, so the
+  4x reruns were not run and `PROTOCOL_EXCEPTIONS` is empty.
+- **Result:** mcslab and OpenMC 0.16.0 agree on all four problems.
+  - All 82 primary checks pass: largest |z| 2.63 (P1 Fe He4-production).
+    Per problem, the largest |z| is 2.63, 2.05, 1.52 and 1.21, and the
+    mean z +0.89, -0.77, +0.68 and +0.53.
+  - All 66 exact checks pass (16, 17, 17 and 16 per problem).
+  - 74 of the 82 checks resolve differences of about 0.5% (median relative
+    SE of the difference 0.16%). The largest gap among them is +0.86%
+    (P1 Fe tritium, 2.3 SE).
+- **Headline values** (mcslab / OpenMC, per source neutron):
+  - FLiBe tritium: P1 0.29905 / 0.29852, P2 0.67976 / 0.68097, P3
+    1.2289 / 1.2266
+  - H-1 absorption (P4): 0.57202 / 0.57120
+- **Tests:** 208 pass (194 before Phase 4, 14 new). Statistical checks:
+  240 in all (82 new). Regressions: Phase 1, Phase 2a, D7 and both tally
+  problems byte-exact; no reference was recorded or changed.
+- **Diagnostics** (no pass/fail):
+  - **Per-bin z beyond 2:** 13.4% (P1), 3.3% (P2), 1.3% (P3) and 6.7% (P4).
+    The P1 excess is one run-wide correlated fluctuation (Fe fast
+    scores, plasma-side region; largest per-bin |z| 4.33). P2's Fe has
+    the opposite sign.
+  - **Uncollided flux:** agrees with the first-flight formula in both
+    codes once OpenMC's bin 0 is restricted to the source energy.
+  - **D37:** probability tables on change D7 by up to 0.92% (W
+    absorption, 1.2 SE) and the left leakage by +0.59% (3.6 SE); an
+    energy cutoff of 0 changes P4 by at most 0.40% (2.5 SE, mostly
+    noise). In both runs every check still passes against mcslab
+    (largest |z| 2.47 and 1.87).
+- **Findings:**
+  - OpenMC 0.16.0's `CollisionFilter` counts (n,2n)-type secondaries as
+    uncollided (deviation 16; a Phase 3 statement corrected).
+  - The two codes use different random-number generators (deviation 6
+    corrected).
+  - An energy exactly on a bin edge is binned in opposite directions
+    (deviation 17; P4's 1 MeV source).
+  - OpenMC's mesh leaks round-off slivers across layer boundaries
+    (deviation 14).
+  - OpenMC's source-site check uses a fixed direction, which needs the
+    buffer cell.
+  - OpenMC tallies are bit-reproducible only on one thread.
+- **Runtimes** (CPU time, not a speed comparison):
+  - mcslab: 22-44 s per problem, 2.5 min for P1-P4 (run alongside OpenMC).
+  - OpenMC, one thread under Rosetta: 158 s (P1), 266 s (P2), 245 s (P3),
+    75 s (P4); 151 s and 67 s for the two D37 runs; about 16 min in all.
+    This is more than estimated. P2's wall time was 886 s, with the
+    machine busy or idle.
+  - New pytest: under 1 s.
+- **Judgment calls:**
+  - The matched energy cutoff is mcslab's actual default, the grid
+    minimum 9.999999999999999e-06 eV, rather than the rounded 1e-5 of
+    the plan text.
+  - `benchmark/jsonio.py` was added (not in the plan's file list).
+  - Two diagnostic-only rules were added after seeing the runs, and are
+    stated as such in `compare.py` and the README:
+    - the two spectrum bins at a source energy on an edge are reported
+      separately
+    - bins without an uncollided event are counted instead of compared
+      with the formula
+    The first comparison attempt also stopped on an infinite z in that
+    second diagnostic before it was handled. No primary check, seed,
+    threshold or setting changed.
+  - The P1 per-bin excursions were reported, not investigated with extra
+    runs: no primary check failed, and the protocol allows extra runs
+    only after a failure.
+  - mcslab keeps its bin-edge convention (deviation 17), since changing it
+    would move byte-exact references for a pure convention.
+  - mcslab's results record a content hash and a dirty flag over
+    `mcslab/` and the runner only, so unrelated local edits do not mark
+    them dirty.
+  - The figures put the depth-bin index on the x-axis, so the thin W bins
+    are visible. Points beyond a panel's range are drawn as triangles on
+    its edge. The spectrum ratio shows bins with SE below 20%.
+  - The palette validator script could not run (no Node.js). The two
+    series colours are slots 1 and 2 of the reference palette, which is
+    documented as validated for its first three slots, and the codes also
+    differ in line style.
