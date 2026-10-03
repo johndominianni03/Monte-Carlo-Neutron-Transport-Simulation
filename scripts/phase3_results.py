@@ -9,8 +9,9 @@ and print the README results table.
 
 The problems are those of tests/test_regression_tally.py, so the numbers are
 exactly those pinned by the tally references. Problem kin_d7 is D7 (seed
-20261023, 20 x 5000, vacuum on both sides); means and SE are over its 20
-batches. The run is also timed with the tallies off (wall clock, printed
+20261023, 20 x 5000, vacuum on both sides); kin_d7_reflect is the same slab
+with a reflective plasma side (seed 20261035, Part B). Means and SE are over
+the 20 batches of each. The run is also timed with the tallies off (wall clock, printed
 only, never written to the JSON).
 
     ./venv/bin/python scripts/phase3_results.py
@@ -37,7 +38,7 @@ from mcslab import postprocess as P                         # noqa: E402
 from mcslab.config_kin import EnergyCutoffWarning, run_kin  # noqa: E402
 from mcslab.nucdata import Library                          # noqa: E402
 
-PROBLEMS = ("kin_d7",)
+PROBLEMS = ("kin_d7", "kin_d7_reflect")
 JSON_OUT = os.path.join(REPO, "docs", "phase3_results.json")
 FIG_OUT = os.path.join(REPO, "docs", "figures", "phase3_profiles.png")
 
