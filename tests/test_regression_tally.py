@@ -21,6 +21,12 @@ and the Phase 3 spectrum grid (20 bins per decade, 1e-5 eV to 19.95 MeV).
 Pinned: tally, mesh_flux, spectrum. The other 8 transport arrays must hash
 exactly as in tests/reference_kin (the spectrum differs only by its grid),
 which ties this reference to the D7 one without duplicating it.
+
+Problem kin_d7_reflect (Part B, approved D17/D19): the same slab, mesh and
+grid with a reflective plasma side (reflect_left), seed 20261035,
+20 x 5000. No other reference covers reflective transport, so all of its
+transport arrays are pinned too, with tally, mesh_flux and
+reflected_weight.
 """
 import argparse
 import dataclasses
@@ -50,6 +56,8 @@ D7_BINS = (10, 20, 20)
 PHASE3_EDGES = tuple(float(10.0 ** (k / 20.0)) for k in range(-100, 147))
 TALLY_ARRAYS = ("tally", "mesh_flux", "spectrum")
 CROSSCHECK_ARRAYS = tuple(a for a in RK.ARRAYS if a != "spectrum")
+REFLECT_SEED = 20261035
+REFLECT_ARRAYS = RK.ARRAYS + ("tally", "mesh_flux", "reflected_weight")
 
 
 def reference_problems(library):
@@ -57,6 +65,10 @@ def reference_problems(library):
     return {
         "kin_d7": (dataclasses.replace(d7, depth_bins=D7_BINS, energy_edges=PHASE3_EDGES),
                    TALLY_ARRAYS, CROSSCHECK_ARRAYS),
+        "kin_d7_reflect": (dataclasses.replace(d7, depth_bins=D7_BINS,
+                                               energy_edges=PHASE3_EDGES, reflect_left=True,
+                                               seed=REFLECT_SEED),
+                           REFLECT_ARRAYS, ()),
     }
 
 

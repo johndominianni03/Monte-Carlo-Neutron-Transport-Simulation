@@ -24,11 +24,12 @@ import numpy as np
 # Event codes: a primary starts; a secondary starts (popped from the bank,
 # or born below the cutoff); a scattering collision (state after it, MT of
 # the channel); an interface crossing; absorbed (state at the collision);
-# leaked (state on the outer surface); energy cutoff; zero-yield; lost.
+# leaked (state on the outer surface); energy cutoff; zero-yield; lost;
+# reflected at the left boundary (state after the reflection, reflect_left).
 EVENT_NAMES = ("source", "born", "collision", "surface", "absorb", "leak", "cutoff",
-               "zero_yield", "lost")
+               "zero_yield", "lost", "reflect")
 EV_SOURCE, EV_BORN, EV_COLLISION, EV_SURFACE, EV_ABSORB, EV_LEAK, EV_CUTOFF, \
-    EV_ZERO_YIELD, EV_LOST = range(9)
+    EV_ZERO_YIELD, EV_LOST, EV_REFLECT = range(10)
 TERMINAL = (EV_ABSORB, EV_LEAK, EV_CUTOFF, EV_ZERO_YIELD, EV_LOST)
 TF_X, TF_U, TF_E, TF_T, TF_NCOL = 0, 1, 2, 3, 4
 TI_PID, TI_PARENT, TI_EVENT, TI_MT, TI_REGION, TI_NCOL = 0, 1, 2, 3, 4, 5

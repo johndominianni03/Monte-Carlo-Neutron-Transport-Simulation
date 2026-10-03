@@ -65,6 +65,10 @@ class KinRunConfig:
         (Phase 3; mcslab/depth_mesh.py, mcslab/responses.py). None (the
         default) turns them off. They draw no random number and change no
         other output.
+    reflect_left: specular reflection at the left boundary (the plasma
+        side; Phase 3 Part B, approved D17) instead of vacuum. No random
+        number is drawn; the reflected weight is in
+        KinResults.reflected_weight. Default False (vacuum).
     """
     geometry: SlabGeometry
     source: Source
@@ -83,6 +87,7 @@ class KinRunConfig:
     n_track: int = 0
     track_capacity: int = 4000
     depth_bins: Optional[Tuple[int, ...]] = None
+    reflect_left: bool = False
 
     def __post_init__(self):
         if self.n_batches < 2:
@@ -126,6 +131,7 @@ class KinResults(Results):
     tally_nuclides: Tuple[str, ...] = ()  # packed nuclide labels, then "total"
     response_present: np.ndarray = None  # (n_nuclides, N_RESP) bool: data exist
     region_atom_density: np.ndarray = None  # (n_regions,) atoms / (b cm)
+    reflected_weight: np.ndarray = None  # (B,) weight reflected at the left boundary
 
     @property
     def counts(self) -> np.ndarray:
@@ -331,7 +337,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                          tally_nuclides=tuple(p.nuclide_names) + ("total",),
                          response_present=(resp.present if mesh is not None else
                                            np.zeros((n_nuc, T.N_RESP), dtype=bool)),
-                         region_atom_density=dens)
+                         region_atom_density=dens,
+                         reflected_weight=np.zeros(config.n_batches, dtype=np.float64))
     b0, b1 = (0, config.n_batches) if batch_range is None else batch_range
     if not 0 <= b0 <= b1 <= config.n_batches:
         raise ValueError(f"bad batch range {batch_range}")
@@ -349,7 +356,8 @@ def run_kin(config: KinRunConfig, batch_range: Optional[Tuple[int, int]] = None,
                     out.diagnostics, out.chan_events, out.chan_created,
                     out.zero_yield_weight, out.chan_zero,
                     *_track_args(out),
-                    rxs, roff, rthr, m_edges, m_eoff, m_boff, out.tally, out.mesh_flux)
+                    rxs, roff, rthr, m_edges, m_eoff, m_boff, out.tally, out.mesh_flux,
+                    bool(config.reflect_left), out.reflected_weight)
 
     if b1 > b0:
         worst = int(out.diagnostics[b0:b1, T.K_MAX_DRAWS].max())

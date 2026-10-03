@@ -69,6 +69,16 @@ Like track recording, the tallies only read particle state: they draw no
 random number and write only their own rows, so every other output is
 bit-identical with them on or off (tests/test_tally_reproducibility.py).
 
+Reflective plasma side (Phase 3 Part B, opt-in reflect_left). A neutron
+reaching the left boundary x = bounds[0] is reflected specularly: u -> -u,
+with v, w, E and t unchanged, x placed exactly on the boundary and the
+region kept. No random number is drawn. A reflection is not a surface
+crossing (surface_sums is untouched, so the balance holds with no left
+leakage); its weight is tallied in reflected_weight. OpenMC reflects with
+Surface::reflect and then renormalises the direction
+(src/boundary_condition.cpp, ReflectiveBC::handle_particle); flipping the
+sign leaves the norm exactly unchanged.
+
 Random-number consumption per event (part of the regression contract):
   source energy   : monoenergetic 0; log-uniform 1 (drawn first)
   source direction: beam 0; isotropic 1
@@ -98,7 +108,7 @@ from .responses import refresh_responses
 from .rng import RNG_DRAWS, RNG_SIZE, init_history, prn
 from .sources import sample_source
 from .tracks import (EV_ABSORB, EV_BORN, EV_COLLISION, EV_CUTOFF, EV_LEAK, EV_LOST,
-                     EV_SOURCE, EV_SURFACE, EV_ZERO_YIELD, TF_E, TF_T, TF_U, TF_X,
+                     EV_REFLECT, EV_SOURCE, EV_SURFACE, EV_ZERO_YIELD, TF_E, TF_T, TF_U, TF_X,
                      TI_EVENT, TI_MT, TI_PARENT, TI_PID, TI_REGION)
 from .tallies import (ABSORPTION, COLL_ESTIMATOR, COLLISION, EST_COLL, EST_COLL_UNC,
                       EST_TL, EST_TL_UNC, K_ABSORBED,
@@ -255,10 +265,11 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                           bank_f, bank_r, bank_p, ci, cf, ct, rng,
                           n_track, trk_f, trk_i, trk_n, trk_trunc,
                           rxs, roff, rthr, m_edges, m_eoff, m_boff, tal, flx, ns, ntot,
-                          pb, pl):
+                          pb, pl, reflect_left, rfw):
     """Follow one source neutron and all its secondaries. Tallies go to this
     batch's rows (reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz, and the
-    response rows tal, flx when the depth mesh has bins). If
+    response rows tal, flx when the depth mesh has bins, and rfw[0], the
+    weight reflected at the left boundary when reflect_left is set). If
     history < n_track its events are recorded in track slot `history`.
     Returns (draws used by the family, lost flag)."""
     do_tal = flx.shape[0] > 0
@@ -436,6 +447,15 @@ def transport_history_kin(history, master_seed, bounds, mat_of_region,
                     r += 1
                     x = bounds[r]
                 else:
+                    if r == 0 and reflect_left:
+                        # specular reflection at the plasma side (approved D17)
+                        x = bounds[0]
+                        u = -u
+                        rfw[0] += wgt
+                        if slot >= 0:
+                            record_event(trk_f, trk_i, trk_n, trk_trunc, slot, pid, parent,
+                                         EV_REFLECT, 0, r, x, u, E, t)
+                        continue
                     surf[NEG, r] += wgt
                     x = bounds[r]
                     r -= 1
@@ -481,7 +501,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                     region_sums, surface_sums, spectrum, cutoff_weight, counts,
                     chan_events, chan_created, zero_yield_weight, chan_zero,
                     n_track, trk_f, trk_i, trk_n, trk_trunc,
-                    rxs, roff, rthr, m_edges, m_eoff, m_boff, tally, mesh_flux):
+                    rxs, roff, rthr, m_edges, m_eoff, m_boff, tally, mesh_flux,
+                    reflect_left, reflected_weight):
     """Run batches [batch_start, batch_end), writing only their rows. Same
     structure and guarantees as transport.run_batches: batch b runs
     histories b*n .. b*n + n - 1, each seeded from (master_seed, id) only.
@@ -516,6 +537,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
         flx = mesh_flux[b]
         tal[:, :, :, :] = 0.0
         flx[:, :] = 0.0
+        rfw = reflected_weight[b:b + 1]
+        rfw[0] = 0.0
         ns = np.zeros((max(max_nuc, 1), N_RESP), dtype=np.float64)
         ntot = np.zeros(N_RESP, dtype=np.float64)
         pb = np.zeros(max_bins, dtype=np.int64)
@@ -545,7 +568,8 @@ def run_batches_kin(batch_start, batch_end, histories_per_batch, master_seed,
                 reg, surf, spec, cutw, cnt, chev, chcr, zyw, chz,
                 bank_f, bank_r, bank_p, ci, cf, ct, rng,
                 n_track, trk_f, trk_i, trk_n, trk_trunc,
-                rxs, roff, rthr, m_edges, m_eoff, m_boff, tal, flx, ns, ntot, pb, pl)
+                rxs, roff, rthr, m_edges, m_eoff, m_boff, tal, flx, ns, ntot, pb, pl,
+                reflect_left, rfw)
             if draws > max_draws:
                 max_draws = draws
         cnt[K_MAX_DRAWS] = max_draws
