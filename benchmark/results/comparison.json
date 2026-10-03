@@ -1,0 +1,1878 @@
+{
+ "description": "Phase 4 comparison of mcslab and OpenMC 0.16.0 (benchmark/compare.py, docs/phase4_plan.md).",
+ "problems_sha256": "8c6f0f82ef58941cf470805d3e1e8617d7f126966ff53600393d361c5a6dd036",
+ "z_limit": 3.0,
+ "n_primary": 82,
+ "n_primary_failed": 0,
+ "max_abs_z": 2.628670747690999,
+ "max_abs_z_at": "P1 Fe He4 207",
+ "exact_all_passed": true,
+ "problems": {
+  "P1": {
+   "title": "D7: W 0.5 | FLiBe 20 | Fe 10 cm, vacuum on both sides",
+   "primary": [
+    {
+     "check": "W flux",
+     "mcslab": [1.1985093778722473, 0.001361540982451025],
+     "openmc": [1.1946313927653476, 0.0013066659185804936],
+     "z": 2.0549904310354594,
+     "weakest": false
+    },
+    {
+     "check": "W absorption",
+     "mcslab": [0.010634020474612054, 6.412801308946428e-05],
+     "openmc": [0.010560188360334496, 5.8123274735708974e-05],
+     "z": 0.853067912487291,
+     "weakest": false
+    },
+    {
+     "check": "W heating 301",
+     "mcslab": [28883.394818362947, 21.67362256920551],
+     "openmc": [28847.60296411189, 23.021150359352458],
+     "z": 1.1319967098382882,
+     "weakest": false
+    },
+    {
+     "check": "W heating-local 901",
+     "mcslab": [470962.2974683913, 518.1712358877162],
+     "openmc": [470168.7071219989, 473.9282721284074],
+     "z": 1.1301204123891297,
+     "weakest": false
+    },
+    {
+     "check": "W damage-energy 444",
+     "mcslab": [4278.9694926166185, 3.18436472858879],
+     "openmc": [4270.0441869476235, 3.329521824365389],
+     "z": 1.937269762310705,
+     "weakest": false
+    },
+    {
+     "check": "W He4 207",
+     "mcslab": [2.7633288537089757e-05, 6.314091378935666e-09],
+     "openmc": [2.7638400089642618e-05, 7.64287309721297e-09],
+     "z": -0.5156054204307932,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe flux",
+     "mcslab": [68.41300902956938, 0.07224749101651924],
+     "openmc": [68.34454977824706, 0.06751133147572856],
+     "z": 0.6923388157130419,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe absorption",
+     "mcslab": [0.27340787285061746, 0.00043213631189582434],
+     "openmc": [0.27281366446654937, 0.00045998263277443],
+     "z": 0.9414983187224693,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating 301",
+     "mcslab": [5941154.867972633, 4144.512757942321],
+     "openmc": [5941194.477554086, 3900.6790386540006],
+     "z": -0.006959523001495959,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating-local 901",
+     "mcslab": [7029920.424995016, 4843.70749818203],
+     "openmc": [7029980.646242172, 4445.580612012793],
+     "z": -0.009159753895154235,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe damage-energy 444",
+     "mcslab": [227588.5965918976, 180.58321067881437],
+     "openmc": [227296.5733799365, 155.72048736538363],
+     "z": 1.2246645036740373,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe He4 207",
+     "mcslab": [0.8780097037184749, 0.0007025638519829603],
+     "openmc": [0.8781172534839109, 0.0006903797535218753],
+     "z": -0.10918785089368165,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205",
+     "mcslab": [0.2990526957729037, 0.0004304819404939889],
+     "openmc": [0.29851504472019263, 0.00046099716407315127],
+     "z": 0.8524129735508309,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li6",
+     "mcslab": [0.17153540718458518, 0.00040972813479582624],
+     "openmc": [0.1708889449763312, 0.00044189762332220734],
+     "z": 1.0727529713219839,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li7",
+     "mcslab": [0.11760381861494981, 9.540029071088713e-05],
+     "openmc": [0.11770587005218117, 8.60741692091244e-05],
+     "z": -0.7942292498477108,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Be9",
+     "mcslab": [0.0026652587337310327, 1.9593155042537265e-06],
+     "openmc": [0.0026663190728716596, 1.8150408447762643e-06],
+     "z": -0.39700852922398455,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 F19",
+     "mcslab": [0.007248211239633539, 5.1688374244913805e-06],
+     "openmc": [0.007253910618809372, 4.868376985061874e-06],
+     "z": -0.8026659735944993,
+     "weakest": false
+    },
+    {
+     "check": "Fe flux",
+     "mcslab": [19.26672227383795, 0.03126463368871218],
+     "openmc": [19.285254794393083, 0.03131529761640067],
+     "z": -0.41880732014807065,
+     "weakest": false
+    },
+    {
+     "check": "Fe absorption",
+     "mcslab": [0.03685735826765856, 0.00010102787396456254],
+     "openmc": [0.036694847203333845, 9.592965640763091e-05],
+     "z": 1.1664869831470075,
+     "weakest": false
+    },
+    {
+     "check": "Fe heating 301",
+     "mcslab": [320423.20018694544, 566.1090533977921],
+     "openmc": [318498.2793696997, 535.0344065602341],
+     "z": 2.471218228350432,
+     "weakest": false
+    },
+    {
+     "check": "Fe heating-local 901",
+     "mcslab": [2080539.2080924544, 3494.9677930161624],
+     "openmc": [2069232.6502130905, 3438.8582238771],
+     "z": 2.3059944035667552,
+     "weakest": false
+    },
+    {
+     "check": "Fe damage-energy 444",
+     "mcslab": [74428.06102933327, 108.03273466902353],
+     "openmc": [74208.33583633877, 106.74933877396843],
+     "z": 1.4467352683936545,
+     "weakest": false
+    },
+    {
+     "check": "Fe He4 207",
+     "mcslab": [0.005824566018038058, 1.2857737727734532e-05],
+     "openmc": [0.005778641214926886, 1.1828147358240294e-05],
+     "z": 2.628670747690999,
+     "weakest": false
+    },
+    {
+     "check": "Fe H3 205",
+     "mcslab": [1.9875859482956964e-07, 5.695056914498568e-10],
+     "openmc": [1.970551974215491e-07, 4.7898051853696e-10],
+     "z": 2.2890514586883177,
+     "weakest": false
+    },
+    {
+     "check": "leakage left",
+     "mcslab": [0.561873, 0.000639456611175268],
+     "openmc": [0.559992175568844, 0.0006300662195921578],
+     "z": 2.0951294399700564,
+     "weakest": false
+    },
+    {
+     "check": "leakage right",
+     "mcslab": [0.375714, 0.0006156494804905492],
+     "openmc": [0.37589192372025493, 0.0005471264927810864],
+     "z": -0.21602300128727134,
+     "weakest": false
+    }
+   ],
+   "n_primary": 26,
+   "n_primary_failed": 0,
+   "max_abs_z": 2.628670747690999,
+   "exact": [
+    {
+     "check": "problem file sha256 (mcslab)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "problem file sha256 (OpenMC)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "data sha256 = pins",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC data sha256 = problem file",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC index = the problem's nuclides",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "atom densities bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mesh edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "spectrum edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC version and commit",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC seed, batches, histories",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC settings as declared",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab seed, batches, histories, cutoff",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "no-data responses exactly 0 in both codes",
+     "passed": true,
+     "detail": "6 values"
+    },
+    {
+     "check": "mcslab balance residual exactly 0, nothing lost",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab max draws <= STRIDE",
+     "passed": true,
+     "detail": "3190 / 152917"
+    },
+    {
+     "check": "OpenMC: no lost particle, no warning",
+     "passed": true,
+     "detail": ""
+    }
+   ],
+   "diagnostic_only": [],
+   "per_bin": {
+    "by_category": {
+     "flux": {
+      "n": 50,
+      "frac_gt_2": 0.08,
+      "frac_gt_3": 0.04,
+      "max_abs": 3.466679306751583,
+      "mean": 0.4972891960414557,
+      "std": 1.133699693488033,
+      "n_nonfinite": 0,
+      "max_at": "W flux bin 9"
+     },
+     "scores": {
+      "n": 1500,
+      "frac_gt_2": 0.162,
+      "frac_gt_3": 0.01,
+      "max_abs": 4.333523037103862,
+      "mean": 0.7297918984586853,
+      "std": 1.175508416621198,
+      "n_nonfinite": 0,
+      "max_at": "FLiBe damage-energy Be9 bin 0"
+     },
+     "spectrum": {
+      "n": 455,
+      "frac_gt_2": 0.05714285714285714,
+      "frac_gt_3": 0.008791208791208791,
+      "max_abs": 3.606385994340721,
+      "mean": 0.07789889775461052,
+      "std": 1.0617117804340703,
+      "n_nonfinite": 0,
+      "max_at": "Fe spectrum bin 132"
+     },
+     "uncollided": {
+      "n": 50,
+      "frac_gt_2": 0.04,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.1232258468425464,
+      "mean": 0.9416678613677313,
+      "std": 0.7219741538786236,
+      "n_nonfinite": 0,
+      "max_at": "Fe uncollided bin 13"
+     }
+    },
+    "one_sided_zero_bins": ["W spectrum bin 106: mcslab 0.000e+00, OpenMC 5.073e-07", "W spectrum bin 107: mcslab 0.000e+00, OpenMC 5.402e-07", "W spectrum bin 108: mcslab 1.063e-06, OpenMC 0.000e+00", "W spectrum bin 109: mcslab 0.000e+00, OpenMC 1.060e-06", "FLiBe spectrum bin 87: mcslab 1.583e-06, OpenMC 0.000e+00", "FLiBe spectrum bin 89: mcslab 0.000e+00, OpenMC 7.955e-07", "FLiBe spectrum bin 90: mcslab 0.000e+00, OpenMC 5.278e-06", "Fe spectrum bin 82: mcslab 1.292e-06, OpenMC 0.000e+00"],
+    "all": {
+     "n": 2055,
+     "frac_gt_2": 0.13381995133819952,
+     "frac_gt_3": 0.010218978102189781,
+     "max_abs": 4.333523037103862,
+     "mean": 0.5849536248354428,
+     "std": 1.173748315172427,
+     "n_nonfinite": 0,
+     "max_at": "FLiBe damage-energy Be9 bin 0"
+    }
+   },
+   "spectrum_source_edge_bins": null,
+   "uncollided": {
+    "vs_first_flight": {
+     "mcslab": {
+      "n": 50,
+      "frac_gt_2": 0.02,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.056004996982422,
+      "mean": 0.5488026364327372,
+      "std": 0.761418192990494,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     },
+     "openmc": {
+      "n": 50,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.9668380296713484,
+      "mean": -0.8006598823019445,
+      "std": 0.8556773743301098,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     }
+    },
+    "openmc_secondary_first_flight_per_layer": {
+     "W": 0.04945945311938808,
+     "FLiBe": 0.7327699039198086,
+     "Fe": 0.17338501285718844
+    },
+    "openmc_primary_uncollided_per_layer": {
+     "W": 0.4598003097283604,
+     "FLiBe": 5.740543147158833,
+     "Fe": 0.21696501667872925
+    }
+   },
+   "openmc_mesh_vs_cell_max_relative": 6.0696874618516365e-12,
+   "openmc_mesh_slivers_max_relative": {
+    "heating": 7.376611999639575e-17,
+    "heating-local": 3.4269392610933006e-16,
+    "damage-energy": 7.50908148868706e-17,
+    "H3-production": 6.884777479746554e-17,
+    "He4-production": 7.282200097322166e-17,
+    "absorption": 2.221060883310971e-15
+   },
+   "bookkeeping": {
+    "mcslab_cutoff_weight_per_source": 0.0,
+    "mcslab_zero_yield_weight_per_source": 0.00502,
+    "mcslab_reflected_weight_per_source": [0.0, 0.0],
+    "mcslab_max_draws": 3190
+   },
+   "default_settings": {
+    "variant": "ptables_on",
+    "exact": [
+     {
+      "check": "problem file sha256 (mcslab)",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "problem file sha256 (OpenMC)",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "data sha256 = pins",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC data sha256 = problem file",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC index = the problem's nuclides",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "atom densities bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mesh edges bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "spectrum edges bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC version and commit",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC seed, batches, histories",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC settings as declared",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mcslab seed, batches, histories, cutoff",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "no-data responses exactly 0 in both codes",
+      "passed": true,
+      "detail": "6 values"
+     },
+     {
+      "check": "mcslab balance residual exactly 0, nothing lost",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mcslab max draws <= STRIDE",
+      "passed": true,
+      "detail": "3190 / 152917"
+     },
+     {
+      "check": "OpenMC: no lost particle, no warning",
+      "passed": true,
+      "detail": ""
+     }
+    ],
+    "rows": [
+     {
+      "check": "W flux",
+      "base": [1.1946313927653476, 0.0013066659185804936],
+      "variant": [1.1984242905823599, 0.0014643193123373593],
+      "change_percent": 0.3174952407899194,
+      "change_se": 1.9326364504984286,
+      "z_vs_mcslab": 0.042554152353828506
+     },
+     {
+      "check": "W absorption",
+      "base": [0.010560188360334496, 5.8123274735708974e-05],
+      "variant": [0.010462768165020515, 5.556240720191265e-05],
+      "change_percent": -0.9225232731634277,
+      "change_se": -1.2115687606997612,
+      "z_vs_mcslab": 2.0182862484982818
+     },
+     {
+      "check": "W heating 301",
+      "base": [28847.60296411189, 23.021150359352458],
+      "variant": [28897.701078118702, 22.344447831529855],
+      "change_percent": 0.17366473765302315,
+      "change_se": 1.5615698722247238,
+      "z_vs_mcslab": -0.4595784717304436
+     },
+     {
+      "check": "W heating-local 901",
+      "base": [470168.7071219989, 473.9282721284074],
+      "variant": [471153.1130724099, 467.60447559459664],
+      "change_percent": 0.20937291986885836,
+      "change_se": 1.4785771916405828,
+      "z_vs_mcslab": -0.2733884337699238
+     },
+     {
+      "check": "W damage-energy 444",
+      "base": [4270.0441869476235, 3.329521824365389],
+      "variant": [4280.909987659439, 3.198779146797437],
+      "change_percent": 0.25446576747447813,
+      "change_se": 2.353366073741951,
+      "z_vs_mcslab": -0.429924103812261
+     },
+     {
+      "check": "W He4 207",
+      "base": [2.7638400089642618e-05, 7.64287309721297e-09],
+      "variant": [2.7631730733852097e-05, 8.814541244907175e-09],
+      "change_percent": -0.024130759265693212,
+      "change_se": -0.5716621433458263,
+      "z_vs_mcslab": 0.14367315647244647
+     },
+     {
+      "check": "FLiBe flux",
+      "base": [68.34454977824706, 0.06751133147572856],
+      "variant": [68.30035975713214, 0.07956005612739163],
+      "change_percent": -0.06465771046600648,
+      "change_se": -0.42350494089136115,
+      "z_vs_mcslab": 1.0482062688966851
+     },
+     {
+      "check": "FLiBe absorption",
+      "base": [0.27281366446654937, 0.00045998263277443],
+      "variant": [0.27320177487338404, 0.0005053760010811831],
+      "change_percent": 0.142262084853254,
+      "change_se": 0.5679393991118209,
+      "z_vs_mcslab": 0.30994921308662876
+     },
+     {
+      "check": "FLiBe heating 301",
+      "base": [5941194.477554086, 3900.6790386540006],
+      "variant": [5930344.6777200075, 4527.057742753711],
+      "change_percent": -0.18261983974887325,
+      "change_se": -1.8156391755793007,
+      "z_vs_mcslab": 1.7612799534093493
+     },
+     {
+      "check": "FLiBe heating-local 901",
+      "base": [7029980.646242172, 4445.580612012793],
+      "variant": [7016922.736788715, 5200.485127405838],
+      "change_percent": -0.18574602279221403,
+      "change_se": -1.908589505329082,
+      "z_vs_mcslab": 1.8289097363937055
+     },
+     {
+      "check": "FLiBe damage-energy 444",
+      "base": [227296.5733799365, 155.72048736538363],
+      "variant": [227169.70489080116, 192.47631746506082],
+      "change_percent": -0.05581627881529096,
+      "change_se": -0.5124337081028253,
+      "z_vs_mcslab": 1.5871502309838599
+     },
+     {
+      "check": "FLiBe He4 207",
+      "base": [0.8781172534839109, 0.0006903797535218753],
+      "variant": [0.8764961709385298, 0.0007611681362254246],
+      "change_percent": -0.18460889351045776,
+      "change_se": -1.5775129642024146,
+      "z_vs_mcslab": 1.461158925107673
+     },
+     {
+      "check": "FLiBe H3 205",
+      "base": [0.29851504472019263, 0.00046099716407315127],
+      "variant": [0.2987396427675171, 0.000505596077297919],
+      "change_percent": 0.07523843481154027,
+      "change_se": 0.32825807650003236,
+      "z_vs_mcslab": 0.4714407262832392
+     },
+     {
+      "check": "FLiBe H3 205 Li6",
+      "base": [0.1708889449763312, 0.00044189762332220734],
+      "variant": [0.17156782905206136, 0.0004875233583816478],
+      "change_percent": 0.39726623382465787,
+      "change_se": 1.0317523781788578,
+      "z_vs_mcslab": -0.05091110462632485
+     },
+     {
+      "check": "FLiBe H3 205 Li7",
+      "base": [0.11770587005218117, 8.60741692091244e-05],
+      "variant": [0.11728318022707596, 8.96405136892478e-05],
+      "change_percent": -0.3591068354686339,
+      "change_se": -3.4012558828478054,
+      "z_vs_mcslab": 2.4493605323231624
+     },
+     {
+      "check": "FLiBe H3 205 Be9",
+      "base": [0.0026663190728716596, 1.8150408447762643e-06],
+      "variant": [0.0026589956833223648, 1.9849938218580037e-06],
+      "change_percent": -0.27466290976973734,
+      "change_se": -2.7227368054514733,
+      "z_vs_mcslab": 2.2455396887944605
+     },
+     {
+      "check": "FLiBe H3 205 F19",
+      "base": [0.007253910618809372, 4.868376985061874e-06],
+      "variant": [0.0072296378050588335, 5.447154451041844e-06],
+      "change_percent": -0.334616940103997,
+      "change_se": -3.322469480641174,
+      "z_vs_mcslab": 2.4734175757137304
+     },
+     {
+      "check": "Fe flux",
+      "base": [19.285254794393083, 0.03131529761640067],
+      "variant": [19.184423634336767, 0.032697323664109997],
+      "change_percent": -0.5228406942574144,
+      "change_se": -2.2271166052426055,
+      "z_vs_mcslab": 1.8191855115045992
+     },
+     {
+      "check": "Fe absorption",
+      "base": [0.036694847203333845, 9.592965640763091e-05],
+      "variant": [0.036576091680508856, 9.074381044897412e-05],
+      "change_percent": -0.32362996953479745,
+      "change_se": -0.8993292172204262,
+      "z_vs_mcslab": 2.071214510580676
+     },
+     {
+      "check": "Fe heating 301",
+      "base": [318498.2793696997, 535.0344065602341],
+      "variant": [318617.030849277, 601.1835024609557],
+      "change_percent": 0.03728481039592409,
+      "change_se": 0.14755626021745397,
+      "z_vs_mcslab": 2.1872467565473572
+     },
+     {
+      "check": "Fe heating-local 901",
+      "base": [2069232.6502130905, 3438.8582238771],
+      "variant": [2068791.4903123057, 3740.262590228057],
+      "change_percent": -0.02131997582482059,
+      "change_se": -0.086827512061196,
+      "z_vs_mcslab": 2.2949154619993926
+     },
+     {
+      "check": "Fe damage-energy 444",
+      "base": [74208.33583633877, 106.74933877396843],
+      "variant": [74140.1684963918, 117.59199422723913],
+      "change_percent": -0.09185941064264132,
+      "change_se": -0.4292155108132411,
+      "z_vs_mcslab": 1.8028901322824527
+     },
+     {
+      "check": "Fe He4 207",
+      "base": [0.005778641214926886, 1.1828147358240294e-05],
+      "variant": [0.005784564839015135, 1.290920672869181e-05],
+      "change_percent": 0.10250894402212167,
+      "change_se": 0.33832565088446437,
+      "z_vs_mcslab": 2.195452282883266
+     },
+     {
+      "check": "Fe H3 205",
+      "base": [1.970551974215491e-07, 4.7898051853696e-10],
+      "variant": [1.9734186763903523e-07, 5.047232732459419e-10],
+      "change_percent": 0.14547711566971902,
+      "change_se": 0.4119880040498963,
+      "z_vs_mcslab": 1.8617273469961573
+     },
+     {
+      "check": "leakage left",
+      "base": [0.559992175568844, 0.0006300662195921578],
+      "variant": [0.5632852869374062, 0.0006715077796428082],
+      "change_percent": 0.5880638180733662,
+      "change_se": 3.5762883531408023,
+      "z_vs_mcslab": -1.5230609659369991
+     },
+     {
+      "check": "leakage right",
+      "base": [0.37589192372025493, 0.0005471264927810864],
+      "variant": [0.3742585748971971, 0.0005207644105750158],
+      "change_percent": -0.4345261815929274,
+      "change_se": -2.162393685513595,
+      "z_vs_mcslab": 1.8049274424530837
+     }
+    ],
+    "max_abs_change_percent": 0.9225232731634277,
+    "max_abs_change_se": 3.5762883531408023,
+    "max_change_se_at": "leakage left",
+    "z_vs_mcslab": {
+     "n": 26,
+     "frac_gt_2": 0.3076923076923077,
+     "frac_gt_3": 0.0,
+     "max_abs": 2.4734175757137304,
+     "mean": 1.1977547220649263,
+     "std": 1.1043791863573755,
+     "n_nonfinite": 0
+    },
+    "n_beyond_3_vs_mcslab": 0
+   }
+  },
+  "P2": {
+   "title": "D7 with a reflective plasma side",
+   "primary": [
+    {
+     "check": "W flux",
+     "mcslab": [4.1546456215949, 0.005064640763727615],
+     "openmc": [4.16191482776566, 0.005728492919122088],
+     "z": -0.9506802874241662,
+     "weakest": false
+    },
+    {
+     "check": "W absorption",
+     "mcslab": [0.09001932383643974, 0.00020065071555538382],
+     "openmc": [0.08989484946066409, 0.00023766230314365712],
+     "z": 0.400191405539556,
+     "weakest": false
+    },
+    {
+     "check": "W heating 301",
+     "mcslab": [37332.70964360536, 39.313895920464944],
+     "openmc": [37333.13628541284, 42.343890376361124],
+     "z": -0.00738383581674112,
+     "weakest": false
+    },
+    {
+     "check": "W heating-local 901",
+     "mcslab": [1056480.9591619903, 1351.5184088804806],
+     "openmc": [1055612.9263874802, 1561.2618140885836],
+     "z": 0.4203590213169805,
+     "weakest": false
+    },
+    {
+     "check": "W damage-energy 444",
+     "mcslab": [6577.346900179661, 6.486344080696808],
+     "openmc": [6583.368500136299, 7.053100707407695],
+     "z": -0.6284140448841083,
+     "weakest": false
+    },
+    {
+     "check": "W He4 207",
+     "mcslab": [2.794714741045093e-05, 9.137479784476556e-09],
+     "openmc": [2.7958399278277066e-05, 1.072525490842946e-08],
+     "z": -0.798578152635136,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe flux",
+     "mcslab": [129.89546257138127, 0.10944927831175778],
+     "openmc": [129.96435618826024, 0.11967727699415708],
+     "z": -0.42480174305938234,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe absorption",
+     "mcslab": [0.6582605138310559, 0.0008134177309451156],
+     "openmc": [0.6594630054169492, 0.0009645258858031479],
+     "z": -0.9530510473090944,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating 301",
+     "mcslab": [8243581.201057475, 4468.4614297150265],
+     "openmc": [8257556.1786978375, 5727.473178078],
+     "z": -1.9237696211039794,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating-local 901",
+     "mcslab": [9531167.853977516, 5083.574946954375],
+     "openmc": [9547433.865672275, 6413.122813001983],
+     "z": -1.9876416217175843,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe damage-energy 444",
+     "mcslab": [313524.6929093612, 193.09729975822623],
+     "openmc": [313786.72328006907, 247.64794382214657],
+     "z": -0.8344067004167235,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe He4 207",
+     "mcslab": [1.298287119367106, 0.0008353534440171607],
+     "openmc": [1.3008639816691585, 0.0010595844579785233],
+     "z": -1.909816949862164,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205",
+     "mcslab": [0.6797576407877337, 0.0008025952260529378],
+     "openmc": [0.68096584116368, 0.0009496400396078244],
+     "z": -0.971712279262851,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li6",
+     "mcslab": [0.5451185828290176, 0.0008366719967634359],
+     "openmc": [0.5460088945048965, 0.000961993122851296],
+     "z": -0.6983210842826651,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li7",
+     "mcslab": [0.1246584339733085, 0.00010774566010591096],
+     "openmc": [0.12496306181063108, 0.00010226354893115131],
+     "z": -2.0506820329452085,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Be9",
+     "mcslab": [0.0026680787001930545, 1.9459548306529226e-06],
+     "openmc": [0.0026714507216687123, 2.1942984755326325e-06],
+     "z": -1.1497370838583654,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 F19",
+     "mcslab": [0.007312545285256512, 5.3320138823389005e-06],
+     "openmc": [0.007322434126479998, 5.9791154318714205e-06],
+     "z": -1.2343686784442143,
+     "weakest": false
+    },
+    {
+     "check": "Fe flux",
+     "mcslab": [27.26998987062564, 0.038278543685475494],
+     "openmc": [27.25266084500059, 0.03420805340431099],
+     "z": 0.337557495944779,
+     "weakest": false
+    },
+    {
+     "check": "Fe absorption",
+     "mcslab": [0.056064247756089036, 0.00013840001995209564],
+     "openmc": [0.05572600093579887, 0.00013877887035077107],
+     "z": 1.72579085420438,
+     "weakest": false
+    },
+    {
+     "check": "Fe heating 301",
+     "mcslab": [327971.8905478763, 661.4654552720859],
+     "openmc": [328895.63666830596, 619.1672186877007],
+     "z": -1.0195447311203167,
+     "weakest": false
+    },
+    {
+     "check": "Fe heating-local 901",
+     "mcslab": [2277141.736512369, 4009.1217530313997],
+     "openmc": [2280494.5716997287, 3910.00946841526],
+     "z": -0.5987088158678197,
+     "weakest": false
+    },
+    {
+     "check": "Fe damage-energy 444",
+     "mcslab": [78615.683765575, 120.34360629199224],
+     "openmc": [78678.93520014825, 122.22332481117701],
+     "z": -0.36875740028304305,
+     "weakest": false
+    },
+    {
+     "check": "Fe He4 207",
+     "mcslab": [0.005847643647695354, 1.4643697991136056e-05],
+     "openmc": [0.005869671814059502, 1.2763511061203403e-05],
+     "z": -1.1339893796204294,
+     "weakest": false
+    },
+    {
+     "check": "Fe H3 205",
+     "mcslab": [1.9798940385868414e-07, 5.541982102382923e-10],
+     "openmc": [1.9855834948730583e-07, 5.003417216844123e-10],
+     "z": -0.7620037263530373,
+     "weakest": false
+    },
+    {
+     "check": "leakage right",
+     "mcslab": [0.4671260000000001, 0.000595677392180999],
+     "openmc": [0.46837292687574994, 0.0004884176925701266],
+     "z": -1.618725804784073,
+     "weakest": false
+    }
+   ],
+   "n_primary": 25,
+   "n_primary_failed": 0,
+   "max_abs_z": 2.0506820329452085,
+   "exact": [
+    {
+     "check": "problem file sha256 (mcslab)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "problem file sha256 (OpenMC)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "data sha256 = pins",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC data sha256 = problem file",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC index = the problem's nuclides",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "atom densities bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mesh edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "spectrum edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC version and commit",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC seed, batches, histories",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC settings as declared",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab seed, batches, histories, cutoff",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "no-data responses exactly 0 in both codes",
+     "passed": true,
+     "detail": "6 values"
+    },
+    {
+     "check": "left leakage exactly 0 in both codes (reflective)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab balance residual exactly 0, nothing lost",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab max draws <= STRIDE",
+     "passed": true,
+     "detail": "3871 / 152917"
+    },
+    {
+     "check": "OpenMC: no lost particle, no warning",
+     "passed": true,
+     "detail": ""
+    }
+   ],
+   "diagnostic_only": [],
+   "per_bin": {
+    "by_category": {
+     "flux": {
+      "n": 50,
+      "frac_gt_2": 0.02,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.0570204372513037,
+      "mean": -0.2269889149420029,
+      "std": 0.7588992198920872,
+      "n_nonfinite": 0,
+      "max_at": "Fe flux bin 19"
+     },
+     "scores": {
+      "n": 1500,
+      "frac_gt_2": 0.027333333333333334,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.957501402369909,
+      "mean": -0.5250364236211581,
+      "std": 0.7626160147939958,
+      "n_nonfinite": 0,
+      "max_at": "Fe absorption Fe56 bin 7"
+     },
+     "spectrum": {
+      "n": 475,
+      "frac_gt_2": 0.05473684210526316,
+      "frac_gt_3": 0.002105263157894737,
+      "max_abs": 3.142205128536835,
+      "mean": 0.11184925530909919,
+      "std": 1.0587947700759341,
+      "n_nonfinite": 0,
+      "max_at": "Fe spectrum bin 109"
+     },
+     "uncollided": {
+      "n": 50,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.902006038396178,
+      "mean": -0.8422571603840864,
+      "std": 0.41957237814062687,
+      "n_nonfinite": 0,
+      "max_at": "Fe uncollided bin 10"
+     }
+    },
+    "one_sided_zero_bins": ["W spectrum bin 95: mcslab 0.000e+00, OpenMC 1.940e-06", "W spectrum bin 96: mcslab 0.000e+00, OpenMC 4.153e-06", "W spectrum bin 103: mcslab 1.157e-06, OpenMC 0.000e+00", "FLiBe spectrum bin 81: mcslab 2.951e-07, OpenMC 0.000e+00", "FLiBe spectrum bin 83: mcslab 1.202e-06, OpenMC 0.000e+00", "FLiBe spectrum bin 84: mcslab 0.000e+00, OpenMC 9.546e-07", "FLiBe spectrum bin 86: mcslab 0.000e+00, OpenMC 2.433e-06"],
+    "all": {
+     "n": 2075,
+     "frac_gt_2": 0.0327710843373494,
+     "frac_gt_3": 0.00048192771084337347,
+     "max_abs": 3.142205128536835,
+     "mean": -0.379705321892154,
+     "std": 0.8783303095574092,
+     "n_nonfinite": 0,
+     "max_at": "Fe spectrum bin 109"
+    }
+   },
+   "spectrum_source_edge_bins": null,
+   "uncollided": {
+    "vs_first_flight": {
+     "mcslab": {
+      "n": 50,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.484221814862025,
+      "mean": -0.49632589523557935,
+      "std": 0.6403274187217469,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     },
+     "openmc": {
+      "n": 50,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.6858892261351723,
+      "mean": 0.7014353157447349,
+      "std": 0.59641010737987,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     }
+    },
+    "openmc_secondary_first_flight_per_layer": {
+     "W": 0.0809487476134129,
+     "FLiBe": 0.8644804674235687,
+     "Fe": 0.17515565543597608
+    },
+    "openmc_primary_uncollided_per_layer": {
+     "W": 0.45991182542457615,
+     "FLiBe": 5.748431262963205,
+     "Fe": 0.21939195505170675
+    }
+   },
+   "openmc_mesh_vs_cell_max_relative": 1.1839112596961764e-11,
+   "openmc_mesh_slivers_max_relative": {
+    "heating": 3.5635533095994446e-16,
+    "heating-local": 1.0084482381714807e-15,
+    "damage-energy": 3.352250679531878e-16,
+    "H3-production": 6.738486924508678e-17,
+    "He4-production": 6.593736059997195e-17,
+    "absorption": 1.6682722848506542e-15
+   },
+   "bookkeeping": {
+    "mcslab_cutoff_weight_per_source": 0.0,
+    "mcslab_zero_yield_weight_per_source": 0.004935,
+    "mcslab_reflected_weight_per_source": [1.7721449999999999, 0.0025313298995994302],
+    "mcslab_max_draws": 3871
+   }
+  },
+  "P3": {
+   "title": "W 0.5 | FLiBe 100 | Fe 10 cm, reflective plasma side",
+   "primary": [
+    {
+     "check": "W flux",
+     "mcslab": [4.178152363562591, 0.006095673549892216],
+     "openmc": [4.170755686486566, 0.006596970991322903],
+     "z": 0.823495219743267,
+     "weakest": false
+    },
+    {
+     "check": "W absorption",
+     "mcslab": [0.09103869450036006, 0.00022343922484672216],
+     "openmc": [0.0909282016934009, 0.000264511375050415],
+     "z": 0.319109749270912,
+     "weakest": false
+    },
+    {
+     "check": "W heating 301",
+     "mcslab": [37463.346732301645, 44.42753165472056],
+     "openmc": [37507.467598236, 39.45653903159388],
+     "z": -0.7425373271768259,
+     "weakest": false
+    },
+    {
+     "check": "W heating-local 901",
+     "mcslab": [1064563.2692429703, 1398.5992273888787],
+     "openmc": [1064588.5119602853, 1756.4445176526845],
+     "z": -0.01124268712034225,
+     "weakest": false
+    },
+    {
+     "check": "W damage-energy 444",
+     "mcslab": [6603.813740025039, 7.251089519972339],
+     "openmc": [6607.95564643914, 7.009029552164545],
+     "z": -0.4107046013698425,
+     "weakest": false
+    },
+    {
+     "check": "W He4 207",
+     "mcslab": [2.7938179982494124e-05, 9.946070597336175e-09],
+     "openmc": [2.793704049823959e-05, 1.0721359178838334e-08],
+     "z": 0.07791687072768455,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe flux",
+     "mcslab": [210.15302220964605, 0.12072918324413401],
+     "openmc": [209.95990049308566, 0.12544300953546714],
+     "z": 1.109245079813959,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe absorption",
+     "mcslab": [1.2057192537263184, 0.0011855491852314918],
+     "openmc": [1.20362877864797, 0.0012208838217180843],
+     "z": 1.2283988581399563,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating 301",
+     "mcslab": [12736544.202567091, 8530.89337078489],
+     "openmc": [12719512.011554034, 8615.846718522987],
+     "z": 1.4047486445970048,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe heating-local 901",
+     "mcslab": [14586217.107812004, 9732.250439334675],
+     "openmc": [14568124.94541898, 9571.302005038502],
+     "z": 1.3254188417015653,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe damage-energy 444",
+     "mcslab": [454234.9025033198, 271.78735033143306],
+     "openmc": [454142.36236556136, 251.4229499950614],
+     "z": 0.24994251857235136,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe He4 207",
+     "mcslab": [2.084219071711102, 0.0015509217791485298],
+     "openmc": [2.080878901312331, 0.0015584707844080608],
+     "z": 1.5191714332356439,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205",
+     "mcslab": [1.228887122297147, 0.0011829886714219136],
+     "openmc": [1.2266189841809054, 0.0012243388850119153],
+     "z": 1.3322485288675003,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li6",
+     "mcslab": [1.0448383954935978, 0.0011683719804757619],
+     "openmc": [1.0429139751800167, 0.0012072458446512405],
+     "z": 1.1454607629617588,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Li7",
+     "mcslab": [0.17150610532502994, 0.0001859160172405698],
+     "openmc": [0.17117572679808274, 0.00017179988000217902],
+     "z": 1.3051207126951174,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 Be9",
+     "mcslab": [0.0032956778295231033, 3.534429091998446e-06],
+     "openmc": [0.003292747043554678, 3.021749748568847e-06],
+     "z": 0.6302669253585953,
+     "weakest": false
+    },
+    {
+     "check": "FLiBe H3 205 F19",
+     "mcslab": [0.009246943649038632, 9.566931079760274e-06],
+     "openmc": [0.009236535159253304, 8.827035322131967e-06],
+     "z": 0.7996063962279131,
+     "weakest": false
+    },
+    {
+     "check": "Fe flux",
+     "mcslab": [0.12056139975811536, 0.0031034595628704627],
+     "openmc": [0.11880024786422577, 0.0028313895538145373],
+     "z": 0.419224118707827,
+     "weakest": true
+    },
+    {
+     "check": "Fe absorption",
+     "mcslab": [0.00032377339725233863, 1.451968375686053e-05],
+     "openmc": [0.0003062728355163482, 1.1618628944317911e-05],
+     "z": 0.941089346730831,
+     "weakest": true
+    },
+    {
+     "check": "Fe heating 301",
+     "mcslab": [359.2059799213519, 18.97124728978856],
+     "openmc": [348.416507424359, 20.28063864611605],
+     "z": 0.388519816090094,
+     "weakest": true
+    },
+    {
+     "check": "Fe heating-local 901",
+     "mcslab": [4834.825693968816, 187.75689754732616],
+     "openmc": [4668.329244427927, 169.9790352280029],
+     "z": 0.6573880343113923,
+     "weakest": true
+    },
+    {
+     "check": "Fe damage-energy 444",
+     "mcslab": [121.78688889033513, 4.9292773642152286],
+     "openmc": [118.8186291735176, 4.756910000442555],
+     "z": 0.43330657364638986,
+     "weakest": true
+    },
+    {
+     "check": "Fe He4 207",
+     "mcslab": [4.559964121031893e-06, 3.733764213408055e-07],
+     "openmc": [4.352095030925636e-06, 4.087359790115783e-07],
+     "z": 0.37548479129383056,
+     "weakest": true
+    },
+    {
+     "check": "leakage right",
+     "mcslab": [0.001474, 3.844502831342698e-05],
+     "openmc": [0.0014140613186158749, 4.234148302963345e-05],
+     "z": 1.0480421999056273,
+     "weakest": false
+    }
+   ],
+   "n_primary": 24,
+   "n_primary_failed": 0,
+   "max_abs_z": 1.5191714332356439,
+   "exact": [
+    {
+     "check": "problem file sha256 (mcslab)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "problem file sha256 (OpenMC)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "data sha256 = pins",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC data sha256 = problem file",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC index = the problem's nuclides",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "atom densities bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mesh edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "spectrum edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC version and commit",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC seed, batches, histories",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC settings as declared",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab seed, batches, histories, cutoff",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "no-data responses exactly 0 in both codes",
+     "passed": true,
+     "detail": "6 values"
+    },
+    {
+     "check": "left leakage exactly 0 in both codes (reflective)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab balance residual exactly 0, nothing lost",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab max draws <= STRIDE",
+     "passed": true,
+     "detail": "3023 / 152917"
+    },
+    {
+     "check": "OpenMC: no lost particle, no warning",
+     "passed": true,
+     "detail": ""
+    }
+   ],
+   "diagnostic_only": [
+    {
+     "check": "Fe H3 205 (diagnostic only, D38)",
+     "mcslab": [6.115232302478017e-11, 9.392991717716442e-12],
+     "openmc": [5.059100907454603e-11, 8.525321585659208e-12],
+     "z": 0.8325824325072723,
+     "weakest": false
+    }
+   ],
+   "per_bin": {
+    "by_category": {
+     "flux": {
+      "n": 80,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.6622462594423155,
+      "mean": 0.26334661233353596,
+      "std": 0.6343511935514261,
+      "n_nonfinite": 0,
+      "max_at": "FLiBe flux bin 37"
+     },
+     "scores": {
+      "n": 2400,
+      "frac_gt_2": 0.007916666666666667,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.488045426219481,
+      "mean": 0.1415911460096311,
+      "std": 0.7801304991297865,
+      "n_nonfinite": 0,
+      "max_at": "FLiBe H3-production Be9 bin 26"
+     },
+     "spectrum": {
+      "n": 452,
+      "frac_gt_2": 0.033185840707964605,
+      "frac_gt_3": 0.0022123893805309734,
+      "max_abs": 3.062801650864745,
+      "mean": 0.12978350489117596,
+      "std": 0.9478962774284613,
+      "n_nonfinite": 0,
+      "max_at": "FLiBe spectrum bin 116"
+     },
+     "uncollided": {
+      "n": 80,
+      "frac_gt_2": 0.05,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.4576768710773367,
+      "mean": 0.5185946035993216,
+      "std": 0.924476418098353,
+      "n_nonfinite": 0,
+      "max_at": "FLiBe uncollided bin 38"
+     }
+    },
+    "one_sided_zero_bins": ["W spectrum bin 92: mcslab 0.000e+00, OpenMC 1.186e-06", "W spectrum bin 98: mcslab 0.000e+00, OpenMC 1.024e-06", "W spectrum bin 99: mcslab 6.571e-07, OpenMC 0.000e+00", "W spectrum bin 102: mcslab 1.146e-07, OpenMC 0.000e+00", "W spectrum bin 103: mcslab 3.814e-06, OpenMC 0.000e+00", "FLiBe spectrum bin 85: mcslab 0.000e+00, OpenMC 2.604e-07", "FLiBe spectrum bin 91: mcslab 1.240e-06, OpenMC 0.000e+00", "Fe spectrum bin 90: mcslab 0.000e+00, OpenMC 1.454e-06", "Fe uncollided bin 9: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 10: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 11: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 12: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 13: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 14: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 15: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 16: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 17: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 18: mcslab 5.000e-07, OpenMC 0.000e+00", "Fe uncollided bin 19: mcslab 5.000e-07, OpenMC 0.000e+00"],
+    "all": {
+     "n": 3012,
+     "frac_gt_2": 0.012616201859229747,
+     "frac_gt_3": 0.00033200531208499334,
+     "max_abs": 3.062801650864745,
+     "mean": 0.1530664647770766,
+     "std": 0.8106940996827259,
+     "n_nonfinite": 0,
+     "max_at": "FLiBe spectrum bin 116"
+    }
+   },
+   "spectrum_source_edge_bins": null,
+   "uncollided": {
+    "vs_first_flight": {
+     "mcslab": {
+      "n": 80,
+      "frac_gt_2": 0.0125,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.1351081312204983,
+      "mean": 0.2918035301399479,
+      "std": 0.8323853477296096,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     },
+     "openmc": {
+      "n": 69,
+      "frac_gt_2": 0.18840579710144928,
+      "frac_gt_3": 0.057971014492753624,
+      "max_abs": 3.4032608802614916,
+      "mean": -0.5088638674604069,
+      "std": 1.2551595388569865,
+      "n_nonfinite": 0,
+      "bins_without_events": 11,
+      "expected_in_those_bins_per_source": 1.0661802223334863e-06
+     }
+    },
+    "openmc_secondary_first_flight_per_layer": {
+     "W": 0.08082276706472946,
+     "FLiBe": 1.1457458872501423,
+     "Fe": 5.956135659701132e-05
+    },
+    "openmc_primary_uncollided_per_layer": {
+     "W": 0.4599000044043672,
+     "FLiBe": 6.137840450855869,
+     "Fe": 4.486145343159165e-06
+    }
+   },
+   "openmc_mesh_vs_cell_max_relative": 5.898228430335235e-10,
+   "openmc_mesh_slivers_max_relative": {
+    "heating": 8.713345061429762e-14,
+    "heating-local": 4.4588540722584163e-14,
+    "damage-energy": 6.035285333981688e-14,
+    "H3-production": 5.863978903294428e-17,
+    "He4-production": 1.2399887336157024e-13,
+    "absorption": 1.644808693380285e-15
+   },
+   "bookkeeping": {
+    "mcslab_cutoff_weight_per_source": 0.0,
+    "mcslab_zero_yield_weight_per_source": 2e-06,
+    "mcslab_reflected_weight_per_source": [1.7845929999999999, 0.0028785126121985047],
+    "mcslab_max_draws": 3023
+   }
+  },
+  "P4": {
+   "title": "H-1 slab, 0.0708 g/cm^3, 30 cm, 1 MeV beam, vacuum on both sides",
+   "primary": [
+    {
+     "check": "H flux",
+     "mcslab": [72.71405278988976, 0.061483799935107414],
+     "openmc": [72.64921918464103, 0.054691572766720056],
+     "z": 0.7878800628600066,
+     "weakest": false
+    },
+    {
+     "check": "H absorption",
+     "mcslab": [0.5720158590074965, 0.0007355830066942623],
+     "openmc": [0.5712018123573157, 0.0006328189199797874],
+     "z": 0.8389371207207361,
+     "weakest": false
+    },
+    {
+     "check": "H heating 301",
+     "mcslab": [983486.1440487585, 663.975083717564],
+     "openmc": [982405.2495734949, 698.5335008613612],
+     "z": 1.1215519549001314,
+     "weakest": false
+    },
+    {
+     "check": "H heating-local 901",
+     "mcslab": [2255256.550472642, 1746.2128248110184],
+     "openmc": [2252365.777573442, 1621.697361019938],
+     "z": 1.213030896682202,
+     "weakest": false
+    },
+    {
+     "check": "H damage-energy 444",
+     "mcslab": [4198.348440822272, 1.8520099783567259],
+     "openmc": [4198.255720668838, 1.9573319653105978],
+     "z": 0.03440909499136177,
+     "weakest": false
+    },
+    {
+     "check": "leakage left",
+     "mcslab": [0.29720199999999997, 0.00044475161607351155],
+     "openmc": [0.2972660000000001, 0.0004220876925495584],
+     "z": -0.10437776342611622,
+     "weakest": false
+    },
+    {
+     "check": "leakage right",
+     "mcslab": [0.12998500000000002, 0.000377148726122947],
+     "openmc": [0.13006899999999996, 0.00032431028601667694],
+     "z": -0.16887422011207642,
+     "weakest": false
+    }
+   ],
+   "n_primary": 7,
+   "n_primary_failed": 0,
+   "max_abs_z": 1.213030896682202,
+   "exact": [
+    {
+     "check": "problem file sha256 (mcslab)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "problem file sha256 (OpenMC)",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "data sha256 = pins",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC data sha256 = problem file",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC index = the problem's nuclides",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "atom densities bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mesh edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "spectrum edges bit-identical",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC version and commit",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC seed, batches, histories",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "OpenMC settings as declared",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab seed, batches, histories, cutoff",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "no-data responses exactly 0 in both codes",
+     "passed": true,
+     "detail": "4 values"
+    },
+    {
+     "check": "mcslab balance residual exactly 0, nothing lost",
+     "passed": true,
+     "detail": ""
+    },
+    {
+     "check": "mcslab max draws <= STRIDE",
+     "passed": true,
+     "detail": "16778 / 152917"
+    },
+    {
+     "check": "OpenMC: no lost particle, no warning",
+     "passed": true,
+     "detail": ""
+    }
+   ],
+   "diagnostic_only": [],
+   "per_bin": {
+    "by_category": {
+     "flux": {
+      "n": 30,
+      "frac_gt_2": 0.0,
+      "frac_gt_3": 0.0,
+      "max_abs": 1.9308523600399612,
+      "mean": 0.23180816552558733,
+      "std": 0.9136821207525264,
+      "n_nonfinite": 0,
+      "max_at": "H flux bin 15"
+     },
+     "scores": {
+      "n": 240,
+      "frac_gt_2": 0.058333333333333334,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.2248510030461444,
+      "mean": 0.39949073395358226,
+      "std": 0.9456392309147466,
+      "n_nonfinite": 0,
+      "max_at": "H damage-energy H1 bin 15"
+     },
+     "spectrum": {
+      "n": 219,
+      "frac_gt_2": 0.0547945205479452,
+      "frac_gt_3": 0.0045662100456621,
+      "max_abs": 3.2579196254473826,
+      "mean": 0.02704181365729539,
+      "std": 1.0247808855883727,
+      "n_nonfinite": 0,
+      "max_at": "H spectrum bin 196"
+     },
+     "uncollided": {
+      "n": 30,
+      "frac_gt_2": 0.3,
+      "frac_gt_3": 0.03333333333333333,
+      "max_abs": 3.4091427557448437,
+      "mean": 1.667052199144352,
+      "std": 0.6840795572792305,
+      "n_nonfinite": 0,
+      "max_at": "H uncollided bin 17"
+     }
+    },
+    "one_sided_zero_bins": [],
+    "all": {
+     "n": 519,
+     "frac_gt_2": 0.0674373795761079,
+     "frac_gt_3": 0.0038535645472061657,
+     "max_abs": 3.4091427557448437,
+     "mean": 0.3059070217339222,
+     "std": 1.037418221510625,
+     "n_nonfinite": 0,
+     "max_at": "H uncollided bin 17"
+    }
+   },
+   "spectrum_source_edge_bins": {
+    "edge_index": 220,
+    "edge_eV": 1000000.0,
+    "layers": {
+     "H": {
+      "219": {
+       "mcslab": [0.6014120186938215, 0.0023379014217878974],
+       "openmc": [6.132667396355049, 0.006185948040879525],
+       "z": -836.421813176626
+      },
+      "220": {
+       "mcslab": [5.545268148670978, 0.00584153698585907],
+       "openmc": [0.0, 0.0],
+       "z": 949.2823827178897
+      },
+      "merged": {
+       "mcslab": [6.146680167364799, 0.006292005834005349],
+       "openmc": [6.132667396355049, 0.006185948040879525],
+       "z": 1.5881077314383396
+      }
+     }
+    }
+   },
+   "uncollided": {
+    "vs_first_flight": {
+     "mcslab": {
+      "n": 30,
+      "frac_gt_2": 0.06666666666666667,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.1210179890893275,
+      "mean": 0.9203303915395005,
+      "std": 0.6869166414946272,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     },
+     "openmc": {
+      "n": 30,
+      "frac_gt_2": 0.23333333333333334,
+      "frac_gt_3": 0.0,
+      "max_abs": 2.7296717170586886,
+      "mean": -1.4724628660398518,
+      "std": 0.6118458421918102,
+      "n_nonfinite": 0,
+      "bins_without_events": 0,
+      "expected_in_those_bins_per_source": 0.0
+     }
+    },
+    "openmc_secondary_first_flight_per_layer": {
+     "H": 0.0
+    },
+    "openmc_primary_uncollided_per_layer": {
+     "H": 5.526882383543128
+    }
+   },
+   "openmc_mesh_vs_cell_max_relative": 3.389108726460702e-14,
+   "openmc_mesh_slivers_max_relative": {
+    "heating": 0.0,
+    "heating-local": 0.0,
+    "damage-energy": 0.0,
+    "H3-production": 0.0,
+    "He4-production": 0.0,
+    "absorption": 0.0
+   },
+   "bookkeeping": {
+    "mcslab_cutoff_weight_per_source": 0.000252,
+    "mcslab_zero_yield_weight_per_source": 0.0,
+    "mcslab_reflected_weight_per_source": [0.0, 0.0],
+    "mcslab_max_draws": 16778
+   },
+   "default_settings": {
+    "variant": "cutoff_0",
+    "exact": [
+     {
+      "check": "problem file sha256 (mcslab)",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "problem file sha256 (OpenMC)",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "data sha256 = pins",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC data sha256 = problem file",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC index = the problem's nuclides",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "atom densities bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mesh edges bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "spectrum edges bit-identical",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC version and commit",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC seed, batches, histories",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "OpenMC settings as declared",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mcslab seed, batches, histories, cutoff",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "no-data responses exactly 0 in both codes",
+      "passed": true,
+      "detail": "4 values"
+     },
+     {
+      "check": "mcslab balance residual exactly 0, nothing lost",
+      "passed": true,
+      "detail": ""
+     },
+     {
+      "check": "mcslab max draws <= STRIDE",
+      "passed": true,
+      "detail": "16778 / 152917"
+     },
+     {
+      "check": "OpenMC: no lost particle, no warning",
+      "passed": true,
+      "detail": ""
+     }
+    ],
+    "rows": [
+     {
+      "check": "H flux",
+      "base": [72.64921918464103, 0.054691572766720056],
+      "variant": [72.81204685504076, 0.058052354445876024],
+      "change_percent": 0.22412858971808416,
+      "change_se": 2.041536658552693,
+      "z_vs_mcslab": -1.158875081641039
+     },
+     {
+      "check": "H absorption",
+      "base": [0.5712018123573157, 0.0006328189199797874],
+      "variant": [0.5735119529119708, 0.0006759562061927939],
+      "change_percent": 0.4044350883834294,
+      "change_se": 2.4948968610263935,
+      "z_vs_mcslab": -1.4975928821973217
+     },
+     {
+      "check": "H heating 301",
+      "base": [982405.2495734949, 698.5335008613612],
+      "variant": [981786.7608350664, 618.2032096813601],
+      "change_percent": -0.06295657914052934,
+      "change_se": -0.6630421803497231,
+      "z_vs_mcslab": 1.8731879212417766
+     },
+     {
+      "check": "H heating-local 901",
+      "base": [2252365.777573442, 1621.697361019938],
+      "variant": [2256883.420785098, 1613.5817601930344],
+      "change_percent": 0.20057324865425769,
+      "change_se": 1.9747576514262315,
+      "z_vs_mcslab": -0.6842535796505097
+     },
+     {
+      "check": "H damage-energy 444",
+      "base": [4198.255720668838, 1.9573319653105978],
+      "variant": [4199.536927098574, 2.001809292485435],
+      "change_percent": 0.030517589088922617,
+      "change_se": 0.45762074826481836,
+      "z_vs_mcslab": -0.43580276752582225
+     },
+     {
+      "check": "leakage left",
+      "base": [0.2972660000000001, 0.0004220876925495584],
+      "variant": [0.2970120000000002, 0.0004446887005563882],
+      "change_percent": -0.08544535870226173,
+      "change_se": -0.41428008124447174,
+      "z_vs_mcslab": 0.3021007381320474
+     },
+     {
+      "check": "leakage right",
+      "base": [0.13006899999999996, 0.00032431028601667694],
+      "variant": [0.129923, 0.00032013209079290666],
+      "change_percent": -0.11224811446228676,
+      "change_se": -0.320386815173501,
+      "z_vs_mcslab": 0.12532908949101476
+     }
+    ],
+    "max_abs_change_percent": 0.4044350883834294,
+    "max_abs_change_se": 2.4948968610263935,
+    "max_change_se_at": "H absorption",
+    "z_vs_mcslab": {
+     "n": 7,
+     "frac_gt_2": 0.0,
+     "frac_gt_3": 0.0,
+     "max_abs": 1.8731879212417766,
+     "mean": -0.21084379459283623,
+     "std": 1.038441304071693,
+     "n_nonfinite": 0
+    },
+    "n_beyond_3_vs_mcslab": 0
+   }
+  }
+ }
+}
