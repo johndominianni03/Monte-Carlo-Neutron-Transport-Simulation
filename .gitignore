@@ -19,3 +19,4 @@ __pycache__/
 outputs/
 scratch/
 *.h5
+Claude outputs/
