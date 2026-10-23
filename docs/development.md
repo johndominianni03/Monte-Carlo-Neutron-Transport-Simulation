@@ -7,9 +7,15 @@ was applied.
 
 ## Environment
 
-- Python is always run from the project venv: `./venv/bin/python`.
-  Tests: `./venv/bin/python -m pytest`.
-- Dependencies are pinned in `requirements.txt`. Upgrading numpy, numba or
+- The environment is managed with uv. Python is always run in the project
+  environment (`.venv`, synced to `uv.lock`): `uv run python`.
+  Tests: `uv run python -m pytest`. `uv sync --locked` creates or restores
+  the environment.
+- Dependencies are pinned exactly in `pyproject.toml` and, with every
+  transitive package, in `uv.lock`; both are committed. The interpreter is
+  Python 3.9.6 (`.python-version`; the references were recorded with
+  Apple's Command Line Tools build). `uv.lock` is changed only on purpose,
+  never by a casual `uv lock --upgrade`. Upgrading numpy, numba or
   llvmlite can change floating-point bits, so it is treated as a physics
   change (see "Regression references").
 - Nuclear data live outside the repository (`MCSLAB_DATA`, fetched by

@@ -22,7 +22,7 @@ ports or gaps. It is not a tritium breeding ratio of any real design.
 
 Writes docs/blanket_sweep.csv and docs/figures/blanket_sweep.png.
 
-    ./venv/bin/python scripts/blanket_sweep.py
+    uv run python scripts/blanket_sweep.py
 """
 import dataclasses
 import os

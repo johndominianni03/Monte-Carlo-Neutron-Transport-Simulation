@@ -210,9 +210,9 @@ Phase 1 and Phase 2a kernels are unchanged.
   the same data, densities, meshes and like-for-like settings, 1e6
   histories each. Pre-declared 3 SE checks compare the results (results
   below).
-- **Two sides, files only.** `benchmark/run_mcslab.py` (mcslab's venv) and
-  `benchmark/run_openmc.py` (OpenMC's own environment) exchange only
-  `benchmark/problems.json` and results JSON.
+- **Two sides, files only.** `benchmark/run_mcslab.py` (mcslab's uv
+  environment) and `benchmark/run_openmc.py` (OpenMC's own environment)
+  exchange only `benchmark/problems.json` and results JSON.
 - **Checks.** `benchmark/compare.py` applies the checks with numpy alone,
   so the comparison runs without OpenMC installed.
 
@@ -235,21 +235,21 @@ run as before.
 ## Usage
 
 ```bash
-./venv/bin/python -m mcslab                                # Phase 1 demo run
-./venv/bin/python -m pytest                                # all tests
-./venv/bin/python tests/test_regression.py compare         # Phase 1 bit-identical regression
-./venv/bin/python tests/test_regression_ce.py compare      # Phase 2a (CE) bit-identical regression
-./venv/bin/python tests/test_regression_kin.py compare     # Phase 2b kinematic bit-identical regression (D7)
-./venv/bin/python scripts/make_inventory.py                # regenerate docs/data_inventory.md
-./venv/bin/python scripts/law_inventory.py                 # regenerate docs/law_inventory.md
-./venv/bin/python scripts/plot_xs.py                       # regenerate docs/figures/*.png
-./venv/bin/python scripts/hydrogen_cutoff.py               # H-1 cutoff fraction, target at rest vs free gas
-./venv/bin/python scripts/record_tracks.py                 # D7 tracks -> outputs/tracks_d7.npz
-./venv/bin/python scripts/animate_tracks.py                # -> docs/figures/tracks.gif, tracks.png
-./venv/bin/python tests/test_regression_tally.py compare   # Phase 3 response-tally bit-identical regression
-./venv/bin/python scripts/phase3_results.py                # D7 results -> docs/phase3_results.json, figure
-./venv/bin/python scripts/blanket_sweep.py                 # Part B sweep -> docs/blanket_sweep.csv, figure (~2 min)
-./venv/bin/python benchmark/compare.py --figures           # Phase 4: mcslab vs OpenMC checks, figures
+uv run python -m mcslab                                # Phase 1 demo run
+uv run python -m pytest                                # all tests
+uv run python tests/test_regression.py compare         # Phase 1 bit-identical regression
+uv run python tests/test_regression_ce.py compare      # Phase 2a (CE) bit-identical regression
+uv run python tests/test_regression_kin.py compare     # Phase 2b kinematic bit-identical regression (D7)
+uv run python scripts/make_inventory.py                # regenerate docs/data_inventory.md
+uv run python scripts/law_inventory.py                 # regenerate docs/law_inventory.md
+uv run python scripts/plot_xs.py                       # regenerate docs/figures/*.png
+uv run python scripts/hydrogen_cutoff.py               # H-1 cutoff fraction, target at rest vs free gas
+uv run python scripts/record_tracks.py                 # D7 tracks -> outputs/tracks_d7.npz
+uv run python scripts/animate_tracks.py                # -> docs/figures/tracks.gif, tracks.png
+uv run python tests/test_regression_tally.py compare   # Phase 3 response-tally bit-identical regression
+uv run python scripts/phase3_results.py                # D7 results -> docs/phase3_results.json, figure
+uv run python scripts/blanket_sweep.py                 # Part B sweep -> docs/blanket_sweep.csv, figure (~2 min)
+uv run python benchmark/compare.py --figures           # Phase 4: mcslab vs OpenMC checks, figures
 ```
 
 A kinematic run (Phase 2b), e.g. a synthetic scatterer:
@@ -426,7 +426,7 @@ the same way, not that the data match experiment.
 - **OpenMC** 0.16.0 (the v0.16.0 tag, commit `617d35a5`), an osx-64 build
   running under Rosetta, in its own environment, on one thread.
   `benchmark/run_openmc.py` builds the model from `benchmark/problems.json`
-  and never imports mcslab. mcslab's venv never imports openmc; the two
+  and never imports mcslab. mcslab's environment never imports openmc; the two
   sides exchange JSON files only. **No speed comparison is made**: OpenMC
   runs emulated here.
 - **The same inputs, checked bit for bit.** Both result files of a problem
@@ -679,16 +679,16 @@ extrapolated cross sections):
 ### Reproducing
 
 ```bash
-# mcslab side (venv): the problem file, then the four problems (~2.5 min)
-MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python benchmark/run_mcslab.py export
-MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python benchmark/run_mcslab.py run
+# mcslab side (uv environment): the problem file, then the four problems (~2.5 min)
+MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python benchmark/run_mcslab.py export
+MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python benchmark/run_mcslab.py run
 # OpenMC side (its own environment; one thread; about 16 min of CPU in all)
 MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 <openmc-env>/bin/python benchmark/run_openmc.py run
 MCSLAB_DATA=... <openmc-env>/bin/python benchmark/run_openmc.py run --problem P1 --variant ptables_on
 MCSLAB_DATA=... <openmc-env>/bin/python benchmark/run_openmc.py run --problem P4 --variant cutoff_0
 # comparison (numpy only) and figures
-./venv/bin/python benchmark/compare.py --figures
-./venv/bin/python -m pytest tests/test_benchmark_openmc.py
+uv run python benchmark/compare.py --figures
+uv run python -m pytest tests/test_benchmark_openmc.py
 ```
 
 - **Rerunning reproduces the committed results exactly.**

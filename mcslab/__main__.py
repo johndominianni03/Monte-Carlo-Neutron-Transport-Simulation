@@ -1,4 +1,4 @@
-"""Small demo run:  ./venv/bin/python -m mcslab"""
+"""Small demo run:  uv run python -m mcslab"""
 import time
 
 from .config import RunConfig, run

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate docs/law_inventory.md: every outgoing-neutron law in the data.
 
-    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python scripts/law_inventory.py
+    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python scripts/law_inventory.py
 
 The scan reads the HDF5 files with h5py only. It does not use
 mcslab.nucdata, so it is an independent account of what the reader and the

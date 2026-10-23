@@ -46,17 +46,20 @@ side, and there is no structure, coolant, ports or gaps.
 
 ## Quick start
 
-Developed on Python 3.9.6 (macOS, Apple silicon). Dependencies are pinned
-exactly, because the bit-identical references depend on them.
+Developed on Python 3.9.6 (macOS, Apple silicon). The environment is managed
+with [uv](https://docs.astral.sh/uv/), and every dependency is pinned exactly
+in `uv.lock`, because the bit-identical references depend on them. uv uses a
+Python 3.9.6 it finds on the system (on macOS, the Command Line Tools'
+`/usr/bin/python3`, with which the references were recorded) and otherwise
+downloads one.
 
 ```bash
 git clone https://github.com/johndominianni03/Monte-Carlo-Neutron-Transport-Simulation.git
 cd Monte-Carlo-Neutron-Transport-Simulation
-python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
+uv sync --locked            # creates .venv from uv.lock
 
-./venv/bin/python -m mcslab     # demo: needs no nuclear data
-./venv/bin/python -m pytest     # tests that need nuclear data are skipped without it
+uv run python -m mcslab     # demo: needs no nuclear data
+uv run python -m pytest     # tests that need nuclear data are skipped without it
 ```
 
 The demo runs a one-group beam through a three-layer slab and prints a table
@@ -98,7 +101,7 @@ print(res.balance())    # every neutron is accounted for: the residual is exactl
 
 ## Reproducing the figures and results
 
-All commands run from the repository root with `./venv/bin/python`.
+All commands run from the repository root with `uv run python`.
 
 | Command | Writes | Needs data |
 |---|---|---|

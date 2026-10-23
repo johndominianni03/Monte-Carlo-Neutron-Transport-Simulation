@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hydrogen energy-cutoff illustration, before and after free-gas scattering.
 
-    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python scripts/hydrogen_cutoff.py
+    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python scripts/hydrogen_cutoff.py
 
 The README / Part 1 problem, with identical inputs: pure H-1 at
 0.0708 g/cm^3 (294 K data), slab [0, 30] cm, 1 MeV beam at x = 0,

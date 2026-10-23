@@ -1,7 +1,7 @@
 """Phase 4: benchmark of mcslab against OpenMC 0.16.0 (docs/phase4_plan.md).
 
-    run_mcslab.py   mcslab side (mcslab's venv); writes problems.json and
-                    results/mcslab_*.json
+    run_mcslab.py   mcslab side (mcslab's uv environment); writes
+                    problems.json and results/mcslab_*.json
     run_openmc.py   OpenMC side (OpenMC's own environment only); reads
                     problems.json, writes results/openmc_*.json
     compare.py      applies the pre-declared checks to a committed pair of
