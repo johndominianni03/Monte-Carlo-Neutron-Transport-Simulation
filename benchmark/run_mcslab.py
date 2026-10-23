@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Phase 4 benchmark, mcslab side (docs/phase4_plan.md, D31-D36, D39).
 
-Runs in mcslab's venv and never imports openmc.
+Runs in mcslab's uv environment (.venv) and never imports openmc.
 
-    MCSLAB_DATA=... ./venv/bin/python benchmark/run_mcslab.py export
-    MCSLAB_DATA=... ./venv/bin/python benchmark/run_mcslab.py run [--problem P1 ...] [--protocol]
-    MCSLAB_DATA=... ./venv/bin/python benchmark/run_mcslab.py check --problem P1
+    MCSLAB_DATA=... uv run python benchmark/run_mcslab.py export
+    MCSLAB_DATA=... uv run python benchmark/run_mcslab.py run [--problem P1 ...] [--protocol]
+    MCSLAB_DATA=... uv run python benchmark/run_mcslab.py check --problem P1
 
 export  Writes benchmark/problems.json, the only input of the OpenMC side:
         bounds; the kernel's own atom densities (PackedXS.mat_dens from

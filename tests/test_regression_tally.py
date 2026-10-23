@@ -9,8 +9,8 @@ the manifest history); `--loose` (rtol 1e-6) is a diagnostic only. The
 manifest pins the sha256 of every HDF5 file used; different data are a
 setup problem (exit 2).
 
-    ./venv/bin/python tests/test_regression_tally.py record --problem kin_d7 --reason "why"
-    ./venv/bin/python tests/test_regression_tally.py compare [--problem NAME] [--loose]
+    uv run python tests/test_regression_tally.py record --problem kin_d7 --reason "why"
+    uv run python tests/test_regression_tally.py compare [--problem NAME] [--loose]
 
 `record` refuses to overwrite an existing reference unless --overwrite is
 given (each reference is meant to be recorded once).
@@ -151,7 +151,7 @@ def test_regression_tally_bit_identical():
     for problem in reference_problems(library):
         _, npz, man = paths(problem)
         assert os.path.isfile(npz) and os.path.isfile(man), (
-            f"no reference for {problem}; run './venv/bin/python "
+            f"no reference for {problem}; run 'uv run python "
             f"tests/test_regression_tally.py record --problem {problem} --reason ...'")
         reference, manifest = load_reference(problem)
         cfg = reference_problems(library)[problem][0]

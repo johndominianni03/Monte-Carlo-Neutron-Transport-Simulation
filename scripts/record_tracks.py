@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Record neutron tracks in the D7 slab and save them for animate_tracks.py.
 
-    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python scripts/record_tracks.py [out.npz]
+    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python scripts/record_tracks.py [out.npz]
 
 Problem D7, as in tests/test_regression_kin.py: a 14.1 MeV beam at x = 0
 on W 0.5 cm (293.6 K) | FLiBe 20 cm (natural Li, 900 K data, Janz

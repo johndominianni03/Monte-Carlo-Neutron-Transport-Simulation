@@ -14,7 +14,7 @@ with a reflective plasma side (seed 20261035, Part B). Means and SE are over
 the 20 batches of each. The run is also timed with the tallies off (wall clock, printed
 only, never written to the JSON).
 
-    ./venv/bin/python scripts/phase3_results.py
+    uv run python scripts/phase3_results.py
 """
 import dataclasses
 import json

@@ -5,9 +5,9 @@ Runs a fixed reference problem (two sources on a 4-region slab with a void
 gap) and compares every raw per-batch tally array against the committed
 reference in tests/reference/.
 
-    ./venv/bin/python tests/test_regression.py record --reason "why"   # write the reference
-    ./venv/bin/python tests/test_regression.py compare                 # byte-exact
-    ./venv/bin/python tests/test_regression.py compare --loose         # rtol 1e-6
+    uv run python tests/test_regression.py record --reason "why"   # write the reference
+    uv run python tests/test_regression.py compare                 # byte-exact
+    uv run python tests/test_regression.py compare --loose         # rtol 1e-6
 
 pytest runs test_regression_bit_identical (strict, byte-exact).
 
@@ -205,7 +205,7 @@ def environment_notes(manifest):
 def test_regression_bit_identical():
     assert os.path.isfile(REFERENCE_NPZ) and os.path.isfile(MANIFEST), (
         f"no reference in {REFERENCE_DIR}; run "
-        "'./venv/bin/python tests/test_regression.py record --reason ...' first")
+        "'uv run python tests/test_regression.py record --reason ...' first")
     reference, manifest = load_reference()
     failures = compare(reference, run_reference(), loose=False)
     if failures:

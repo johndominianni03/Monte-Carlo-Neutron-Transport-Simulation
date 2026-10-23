@@ -6,8 +6,8 @@ benchmark/results/. Needs numpy only (matplotlib only with --figures); it
 imports neither openmc, mcslab nor h5py, so the comparison is reproducible
 without OpenMC installed.
 
-    ./venv/bin/python benchmark/compare.py            # tables, results/comparison.json
-    ./venv/bin/python benchmark/compare.py --figures  # also docs/figures/phase4_*.png
+    uv run python benchmark/compare.py            # tables, results/comparison.json
+    uv run python benchmark/compare.py --figures  # also docs/figures/phase4_*.png
 
 Rules (fixed before any benchmark run):
 - z = (mcslab - OpenMC) / sqrt(SE_m^2 + SE_o^2), means and SEs over 100

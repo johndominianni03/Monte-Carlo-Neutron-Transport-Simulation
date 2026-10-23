@@ -1,0 +1,26 @@
+[project]
+name = "mcslab"
+version = "0.0.0"
+description = "1D slab Monte Carlo neutron transport (Python + Numba)"
+readme = "README.md"
+# Pinned exactly: the bit-identical regression references depend on the
+# numpy / numba / llvmlite versions (libm and LLVM codegen). Upgrading any of
+# these may require regenerating the references with a stated reason.
+# Developed on Python 3.9.6 (macOS Command Line Tools, Apple Silicon).
+requires-python = "==3.9.*"
+dependencies = [
+    "numpy==2.0.2",
+    "numba==0.60.0",
+    "llvmlite==0.43.0",
+    "scipy==1.13.1",
+    "matplotlib==3.9.4",
+    "h5py==3.14.0",
+]
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[tool.uv]
+# Not installed into the environment: mcslab is imported from the repository
+# root (pytest.ini pythonpath, and the harnesses' sys.path), as before.
+package = false

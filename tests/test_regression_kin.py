@@ -5,8 +5,8 @@ Same rules and CLI as tests/test_regression.py (read its docstring), with
 its own reference in tests/reference_kin/, so the Phase 1 and Phase 2a
 references are never touched by kinematic-kernel work:
 
-    ./venv/bin/python tests/test_regression_kin.py record --reason "why"
-    ./venv/bin/python tests/test_regression_kin.py compare [--loose]
+    uv run python tests/test_regression_kin.py record --reason "why"
+    uv run python tests/test_regression_kin.py compare [--loose]
 
 As in the CE harness, the manifest pins the sha256 of every HDF5 file
 used. Different data are a setup problem (exit 2), not a pass or a fail.
@@ -151,7 +151,7 @@ def test_regression_kin_bit_identical():
         pytest.skip(f"nuclear data not available ({exc})")
     assert os.path.isfile(REFERENCE_NPZ) and os.path.isfile(MANIFEST), (
         f"no reference in {REFERENCE_DIR}; run "
-        "'./venv/bin/python tests/test_regression_kin.py record --reason ...' first")
+        "'uv run python tests/test_regression_kin.py record --reason ...' first")
     reference, manifest = load_reference()
     bad_data = data_mismatches(manifest, library)
     assert not bad_data, "nuclear data differ from the reference's:\n  " + "\n  ".join(bad_data)

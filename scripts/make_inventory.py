@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate docs/data_inventory.md from the nuclear data files themselves.
 
-    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python scripts/make_inventory.py
+    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python scripts/make_inventory.py
 
 Everything in the output is read from the HDF5 files or computed from them
 (through mcslab.nucdata and mcslab.xs). Nothing is typed in by hand except

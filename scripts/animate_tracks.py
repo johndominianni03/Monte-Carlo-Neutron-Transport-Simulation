@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Animate recorded neutron tracks: depth vs log10 energy over time.
 
-    ./venv/bin/python scripts/animate_tracks.py [tracks.npz] [--families 40] [--frames 100]
+    uv run python scripts/animate_tracks.py [tracks.npz] [--families 40] [--frames 100]
 
 Reads only a saved recording (scripts/record_tracks.py writes
 outputs/tracks_d7.npz); it runs no transport. Writes

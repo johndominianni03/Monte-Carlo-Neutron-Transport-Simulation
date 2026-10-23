@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plot cross sections vs energy on log-log axes, saved as PNGs in docs/figures/.
 
-    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 ./venv/bin/python scripts/plot_xs.py
+    MCSLAB_DATA=~/nuclear_data/endfb-viii.0-hdf5 uv run python scripts/plot_xs.py
 
 Figures (1e-5 eV to 20 MeV, with a marker and value label at 14.1 MeV):
   fe56_total.png           Fe-56 total (sum of non-redundant reactions)

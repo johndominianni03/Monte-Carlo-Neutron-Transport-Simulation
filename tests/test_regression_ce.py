@@ -5,8 +5,8 @@ Same rules and CLI as tests/test_regression.py (read its docstring), with a
 separate reference in tests/reference_ce/, so the Phase 1 reference is never
 touched by CE work:
 
-    ./venv/bin/python tests/test_regression_ce.py record --reason "why"
-    ./venv/bin/python tests/test_regression_ce.py compare [--loose]
+    uv run python tests/test_regression_ce.py record --reason "why"
+    uv run python tests/test_regression_ce.py compare [--loose]
 
 The problems use real ENDF/B-VIII.0 data. The manifest also pins the sha256
 of every HDF5 file used. If the data differ from the reference's, compare
@@ -132,7 +132,7 @@ def test_regression_ce_bit_identical():
         pytest.skip(f"nuclear data not available ({exc})")
     assert os.path.isfile(REFERENCE_NPZ) and os.path.isfile(MANIFEST), (
         f"no reference in {REFERENCE_DIR}; run "
-        "'./venv/bin/python tests/test_regression_ce.py record --reason ...' first")
+        "'uv run python tests/test_regression_ce.py record --reason ...' first")
     reference, manifest = load_reference()
     bad_data = data_mismatches(manifest, library)
     assert not bad_data, "nuclear data differ from the reference's:\n  " + "\n  ".join(bad_data)
